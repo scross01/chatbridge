@@ -1,3 +1,5 @@
 oci
 fastapi
 uvicorn
+pydantic
+python-multipart
