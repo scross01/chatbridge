@@ -1,4 +1,5 @@
 import oci
+import datetime
 import uuid
 
 from fastapi import FastAPI
@@ -65,7 +66,114 @@ async def get_models():
 @app.post("/chat/completions")
 @app.post("/v1/chat/completions")
 async def chat_completions(form_data: OpenAIChatCompletionForm):
+    if form_data.model.startswith("meta."):
+        return meta_chat_completions(form_data=form_data)
+    elif form_data.model.startswith("cohere."):
+        return cohere_chat_completions(form_data=form_data)
+    else:
+        # unsupported model type
+        return
 
+
+def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
+    print(form_data)
+
+    serving_mode = oci.generative_ai_inference.models.OnDemandServingMode(
+        serving_type="ON_DEMAND",
+        model_id=form_data.model,
+    )
+
+    chat_history = []
+    # collect the message history, excluding the last one which is the user's input
+    for message in form_data.messages[:-1]:
+        if message.role == "system":
+            chat_history.append(
+                oci.generative_ai_inference.models.CohereSystemMessage(
+                    message=message.content
+                )
+            )
+        elif message.role == "user":
+            chat_history.append(
+                oci.generative_ai_inference.models.CohereUserMessage(
+                    message=message.content
+                )
+            )
+        elif message.role == "assistant":
+            chat_history.append(
+                oci.generative_ai_inference.models.CohereChatBotMessage(
+                    message=message.content
+                )
+            )
+        else:
+            raise ValueError(f"Unsupported role: {message.role}")
+
+    prompt = form_data.messages[-1].content
+
+    chat_request = oci.generative_ai_inference.models.CohereChatRequest(
+        message=prompt,
+        chat_history=chat_history,
+        response_format=oci.generative_ai_inference.models.CohereResponseTextFormat(),
+        is_stream=False,  # TODO form_data.stream
+        seed=form_data.seed,
+        temperature=form_data.temperature,
+        max_tokens=form_data.max_tokens,
+        top_k=form_data.top_k,
+        top_p=form_data.top_p,
+        frequency_penalty=form_data.frequency_penalty,
+        presence_penalty=form_data.presence_penalty,
+        stop_sequences=form_data.stop,
+        # documents=[],
+        # is_search_queries_only=,
+        # preamble_override=,
+        # max_input_tokens=,
+        # prompt_truncation=, # "OFF", "AUTO_PRESERVE_ORDER"
+        # is_echo=,
+        # tools=,
+        # tool_results=,
+        # is_force_single_step=,
+        # is_raw_prompting=,
+        # citation_quality=, # "ACCURATE","FAST"
+    )
+
+    chat_details = oci.generative_ai_inference.models.ChatDetails(
+        compartment_id=config["tenancy"],
+        serving_mode=serving_mode,
+        chat_request=chat_request,
+    )
+
+    print(chat_request)
+
+    response = inference_client.chat(chat_details=chat_details)
+
+    print(response.data)
+
+    # convert response format.
+    # only use the last item from the chat history
+    choices = []
+    item = response.data.chat_response.chat_history[-1]
+    choices.append(
+        OpenAIChatChoice(
+            message=OpenAIChatMessage(
+                role=item.role.lower() if item.role != "CHATBOT" else "assistant",
+                content=item.message,
+            ),
+            finish_reason=response.data.chat_response.finish_reason,
+            index=0,
+        )
+    )
+
+    print(choices)
+
+    return OpenAIChatCompletionResponse(
+        id=f"{response.data.model_id}-{str(uuid.uuid4())}",
+        object="chat.completion",
+        created=int(datetime.datetime.now().timestamp()),
+        model=response.data.model_id,
+        choices=choices,
+    )
+
+
+def meta_chat_completions(form_data: OpenAIChatCompletionForm):
     print(form_data)
 
     # convert message format
@@ -127,6 +235,8 @@ async def chat_completions(form_data: OpenAIChatCompletionForm):
                 finish_reason=choice.finish_reason,
             )
         )
+
+    print(choices)
 
     return OpenAIChatCompletionResponse(
         id=f"{response.data.model_id}-{str(uuid.uuid4())}",
