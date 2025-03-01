@@ -1,6 +1,7 @@
 import oci
+import uuid
+
 from fastapi import FastAPI
-from pydantic import BaseModel
 
 from schema import (
     OpenAIChatMessage,
@@ -9,8 +10,6 @@ from schema import (
     OpenAIChatCompletionResponse,
     OpenAIModel,
 )
-
-import uuid
 
 app = FastAPI()
 
@@ -27,7 +26,7 @@ inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(
 )
 
 
-# Open AI Compatible API endpoint to fetch list of supported models
+# Open AI compatible API endpoint to fetch list of supported models
 # https://platform.openai.com/docs/api-reference/models
 @app.get("/models")
 @app.get("/v1/models")
@@ -36,9 +35,9 @@ async def get_models():
     response = generative_ai_client.list_models(
         config["tenancy"],
         lifecycle_state="ACTIVE",
-        capability=["CHAT"],    # NOTE: this filter has no effect - BUG?
+        capability=["CHAT"],  # NOTE: this filter has no effect - BUG?
         sort_by="displayName",  # NOTE: this option has no effect - BUG?
-        sort_order="ASC",       # NOTE: this option has no effect - BUG?
+        sort_order="ASC",  # NOTE: this option has no effect - BUG?
     )
 
     # filter the response
@@ -61,6 +60,7 @@ async def get_models():
     }
 
 
+# Open AI compatible API endpoint for chat completions
 # https://platform.openai.com/docs/api-reference/chat/create
 @app.post("/chat/completions")
 @app.post("/v1/chat/completions")
@@ -92,6 +92,14 @@ async def chat_completions(form_data: OpenAIChatCompletionForm):
         api_format="GENERIC",
         messages=messages,
         is_stream=False,  # TODO form_data.stream
+        seed=form_data.seed,
+        temperature=form_data.temperature,
+        max_tokens=form_data.max_tokens,
+        top_k=form_data.top_k,
+        top_p=form_data.top_p,
+        frequency_penalty=form_data.frequency_penalty,
+        presence_penalty=form_data.presence_penalty,
+        stop=form_data.stop,
     )
 
     chat_details = oci.generative_ai_inference.models.ChatDetails(
@@ -127,53 +135,3 @@ async def chat_completions(form_data: OpenAIChatCompletionForm):
         model=response.data.model_id,
         choices=choices,
     )
-
-
-# XXX Remove
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
-
-
-class Echo(BaseModel):
-    echo: str
-
-
-# XXX Remove
-@app.post("/echo")
-async def echo(echo: Echo):
-    return {"echo": echo.echo}
-
-
-"""
-    messages: list,
-    model: str,
-    store: bool = False,
-    reasoning_effort: str = None,
-    metadata: dict = None,
-    frequency_penalty: float = 0.0,
-    logit_bias: list = [],
-    logprobs: bool = False,
-    top_logprobs: int = None,
-    max_tokens: int = None,  # deprcated
-    max_completion_tokens: int = None,
-    n: int = 1,
-    modalities: list[str] = ["text"],
-    prediction: object = None,
-    audio: object = None,
-    presence_penalty: float = 0.0,
-    response_format: dict = {"type": "text"},
-    seed: int = None,
-    service_tier: str = None,
-    stop: list = [],
-    stream: bool = False,
-    stream_options: object = None,
-    temperature: float = 1.0,
-    top_p: float = 1.0,
-    tools: list = None,
-    tool_choice: str = None,
-    parallel_tool_calls: bool = True,
-    user: str = None,
-    function_call: str = None, # deprecated
-    functions: list = [], # deprecated
-"""
