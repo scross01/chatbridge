@@ -1,8 +1,12 @@
 import oci
 import datetime
+import json
 import uuid
 
 from fastapi import FastAPI
+# from fastapi.responses import StreamingResponse
+from sse_starlette import EventSourceResponse
+
 
 from schema import (
     OpenAIChatMessage,
@@ -199,7 +203,7 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
     chat_request = oci.generative_ai_inference.models.GenericChatRequest(
         api_format="GENERIC",
         messages=messages,
-        is_stream=False,  # TODO form_data.stream
+        is_stream=form_data.stream,
         seed=form_data.seed,
         temperature=form_data.temperature,
         max_tokens=form_data.max_tokens,
@@ -220,28 +224,94 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
 
     response = inference_client.chat(chat_details=chat_details)
 
-    print(response.data)
-
-    # convert response format
-    choices = []
-    for choice in response.data.chat_response.choices:
-        choices.append(
-            OpenAIChatChoice(
-                index=choice.index,
-                message=OpenAIChatMessage(
-                    role=choice.message.role.lower(),
-                    content=choice.message.content[0].text,
-                ),
-                finish_reason=choice.finish_reason,
+    if form_data.stream:
+        # re-stream the response
+        return EventSourceResponse(restreamer(response, form_data.model))
+    else:
+        print(response.data)
+        # convert response format
+        choices = []
+        for choice in response.data.chat_response.choices:
+            choices.append(
+                OpenAIChatChoice(
+                    index=choice.index,
+                    message=OpenAIChatMessage(
+                        role=choice.message.role.lower(),
+                        content=choice.message.content[0].text,
+                    ),
+                    finish_reason=choice.finish_reason,
+                )
             )
+        print(choices)
+        return OpenAIChatCompletionResponse(
+            id=f"{response.data.model_id}-{str(uuid.uuid4())}",
+            object="chat.completion",
+            created=int(response.data.chat_response.time_created.timestamp()),
+            model=response.data.model_id,
+            choices=choices,
         )
 
-    print(choices)
 
-    return OpenAIChatCompletionResponse(
-        id=f"{response.data.model_id}-{str(uuid.uuid4())}",
-        object="chat.completion",
-        created=int(response.data.chat_response.time_created.timestamp()),
-        model=response.data.model_id,
-        choices=choices,
-    )
+# response re-streamer
+# https://platform.openai.com/docs/api-reference/chat/streaming
+async def restreamer(response, model):
+    try:
+        id = f"chatcmpl-{str(uuid.uuid4())}"
+        first_event = True
+        for event in response.data.events():
+            print(event.data)
+            chunk = json.loads(event.data)
+
+            if "message" in chunk:
+                if first_event:
+                    # send role event
+                    message = json.dumps({  # TODO convert to schema object
+                        "id": id,
+                        "object": "chat.completion.chunk",
+                        "created": int(datetime.datetime.now().timestamp()),
+                        "model": model,
+                        "choices": [{
+                            "index": 0,
+                            "delta": {
+                                "role": chunk["message"]["role"].lower(),
+                                "finish_reason": None,
+                            }
+                        }]
+                    })
+                    first_event = False
+                    print(message)
+                    yield message
+
+                # send content
+                message = json.dumps({  # TODO convert to schema object
+                    "id": id,
+                    "object": "chat.completion.chunk",
+                    "created": int(datetime.datetime.now().timestamp()),
+                    "model": model,
+                    "choices": [{
+                        "index": 0,
+                        "delta": {
+                            "content": chunk["message"]["content"][0]["text"],
+                            "finish_reason": None,
+                        }
+                    }]
+                })
+                print(message)
+                yield message
+            elif "finishReason" in chunk:
+                finish = json.dumps({  # TODO convert to schema object
+                    "id": id,
+                    "object": "chat.completion.chunk",
+                    "created": int(datetime.datetime.now().timestamp()),
+                    "model": model,
+                    "choices": [{
+                        "index": 0,
+                        "delta": {},
+                        "finish_reason": chunk["finishReason"],
+                    }]
+                })
+                print(finish)
+                yield finish
+    except:  # TODO
+        print("Exception",  event.data)
+        pass
