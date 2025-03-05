@@ -26,9 +26,11 @@ not working:
 
 ## Roadmap
 
-TODO add support for streaming responses
-- DOING streaming for meta models
-- DOING streaming for cohere models
+BUG cohere and meta models are not getting the correct `end` event. need to manually stop
+TODO rename from facade to adapter to correctly represent the adapter pattern
+DONE add support for streaming responses
+- DONE streaming for meta models
+- DONE streaming for cohere models
 TODO add support for embedding models
 TODO add support for images
 TODO add support for documents and RAG
