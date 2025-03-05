@@ -1,9 +1,11 @@
 import oci
 import datetime
 import json
+import sys
 import uuid
 
 from fastapi import FastAPI
+from pydantic import ValidationError
 
 # from fastapi.responses import StreamingResponse
 from sse_starlette import EventSourceResponse
@@ -14,6 +16,9 @@ from schema import (
     OpenAIChatCompletionForm,
     OpenAIChatCompletionResponse,
     OpenAIModel,
+    OpenAIChatDelta,
+    OpenAIChatChunkChoice,
+    OpenAIChatCompletionChunkResponse,
 )
 
 app = FastAPI()
@@ -255,65 +260,62 @@ async def meta_restreamer(response, model):
 
             if "message" in chunk:
                 if first_event:
-                    # send role event
-                    message = json.dumps(
-                        {  # TODO convert to schema object
-                            "id": id,
-                            "object": "chat.completion.chunk",
-                            "created": int(datetime.datetime.now().timestamp()),
-                            "model": model,
-                            "choices": [
-                                {
-                                    "index": 0,
-                                    "delta": {
-                                        "role": chunk["message"]["role"].lower(),
-                                        "finish_reason": None,
-                                    },
-                                }
-                            ],
-                        }
+                    # send just the role first as a separate chunk
+                    message = OpenAIChatCompletionChunkResponse(
+                        id=id,
+                        object="chat.completion.chunk",
+                        created=int(datetime.datetime.now().timestamp()),
+                        model=model,
+                        choices=[
+                            OpenAIChatChunkChoice(
+                                index=0,
+                                delta=OpenAIChatDelta(
+                                    role=chunk["message"]["role"].lower(),
+                                    finish_reason=None,
+                                ),
+                            )
+                        ],
                     )
                     first_event = False
-                    yield message
+                    yield message.model_dump_json()
 
-                # send content
-                message = json.dumps(
-                    {  # TODO convert to schema object
-                        "id": id,
-                        "object": "chat.completion.chunk",
-                        "created": int(datetime.datetime.now().timestamp()),
-                        "model": model,
-                        "choices": [
-                            {
-                                "index": 0,
-                                "delta": {
-                                    "content": chunk["message"]["content"][0]["text"],
-                                    "finish_reason": None,
-                                },
-                            }
-                        ],
-                    }
+                # send message content
+                message = OpenAIChatCompletionChunkResponse(
+                    id=id,
+                    object="chat.completion.chunk",
+                    created=int(datetime.datetime.now().timestamp()),
+                    model=model,
+                    choices=[
+                        OpenAIChatChunkChoice(
+                            index=0,
+                            delta=OpenAIChatDelta(
+                                content=chunk["message"]["content"][0]["text"],
+                                finish_reason=None,
+                            ),
+                        )
+                    ],
                 )
-                yield message
+                yield message.model_dump_json()
             elif "finishReason" in chunk:
-                finish = json.dumps(
-                    {  # TODO convert to schema object
-                        "id": id,
-                        "object": "chat.completion.chunk",
-                        "created": int(datetime.datetime.now().timestamp()),
-                        "model": model,
-                        "choices": [
-                            {
-                                "index": 0,
-                                "delta": {},
-                                "finish_reason": chunk["finishReason"],
-                            }
-                        ],
-                    }
+                finish = OpenAIChatCompletionChunkResponse(
+                    id=id,
+                    object="chat.completion.chunk",
+                    created=int(datetime.datetime.now().timestamp()),
+                    model=model,
+                    choices=[
+                        OpenAIChatChunkChoice(
+                            index=0,
+                            delta=OpenAIChatDelta(),
+                            finish_reason=chunk["finishReason"],
+                        ),
+                    ],
                 )
-                yield finish
+                yield finish.model_dump_json()
+    except ValidationError as ve:
+        print("ValidationError", ve, event.data)
     except:  # TODO
-        print("Exception", event.data)
+        e = sys.exc_info()[0]
+        print("Exception", e, event.data)
         pass
 
 
@@ -323,42 +325,41 @@ async def cohere_restreamer(response, model):
         for event in response.data.events():
             chunk = json.loads(event.data)
             if "finishReason" in chunk:
-                finish = json.dumps(
-                    {  # TODO convert to schema object
-                        "id": id,
-                        "object": "chat.completion.chunk",
-                        "created": int(datetime.datetime.now().timestamp()),
-                        "model": model,
-                        "choices": [
-                            {
-                                "index": 0,
-                                "delta": {},
-                                "finish_reason": chunk["finishReason"],
-                            }
-                        ],
-                    }
+                finish = OpenAIChatCompletionChunkResponse(
+                    id=id,
+                    object="chat.completion.chunk",
+                    created=int(datetime.datetime.now().timestamp()),
+                    model=model,
+                    choices=[
+                        OpenAIChatChunkChoice(
+                            index=0,
+                            delta=OpenAIChatDelta(),
+                            finish_reason=chunk["finishReason"],
+                        ),
+                    ],
                 )
-                yield finish
+                yield finish.model_dump_json()
             elif "text" in chunk:
                 # send content
-                message = json.dumps(
-                    {  # TODO convert to schema object
-                        "id": id,
-                        "object": "chat.completion.chunk",
-                        "created": int(datetime.datetime.now().timestamp()),
-                        "model": model,
-                        "choices": [
-                            {
-                                "index": 0,
-                                "delta": {
-                                    "content": chunk["text"],
-                                    "finish_reason": None,
-                                },
-                            }
-                        ],
-                    }
+                message = OpenAIChatCompletionChunkResponse(
+                    id=id,
+                    object="chat.completion.chunk",
+                    created=int(datetime.datetime.now().timestamp()),
+                    model=model,
+                    choices=[
+                        OpenAIChatChunkChoice(
+                            index=0,
+                            delta=OpenAIChatDelta(
+                                content=chunk["text"],
+                                finish_reason=None,
+                            ),
+                        )
+                    ],
                 )
-                yield message
+                yield message.model_dump_json()
+    except ValidationError as ve:
+        print("ValidationError", ve, event.data)
     except:  # TODO
-        print("Exception", event.data)
+        e = sys.exc_info()[0]
+        print("Exception", e, event.data)
         pass

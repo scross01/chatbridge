@@ -48,3 +48,22 @@ class OpenAIChatCompletionResponse(BaseModel):
     created: int
     model: str
     choices: List[OpenAIChatChoice]
+
+
+class OpenAIChatDelta(BaseModel):
+    role: Optional[str] = None
+    content: Optional[str] = None
+    finish_reason: Optional[str] = None
+
+
+class OpenAIChatChunkChoice(BaseModel):
+    index: int
+    delta: OpenAIChatDelta
+
+
+class OpenAIChatCompletionChunkResponse(BaseModel):
+    id: str
+    object: str
+    created: int
+    model: str
+    choices: List[OpenAIChatChunkChoice]
