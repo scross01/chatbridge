@@ -4,6 +4,8 @@ from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
 
+# simplified representation of OpenAI Chat API response
+# https://platform.openai.com/docs/api-reference/chat/create
 class OpenAIChatMessage(BaseModel):
     role: str
     content: str | List
@@ -11,6 +13,8 @@ class OpenAIChatMessage(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+# representation of an OpenAI Chat request
+# https://platform.openai.com/docs/api-reference/chat
 class OpenAIChatCompletionForm(BaseModel):
     stream: bool = True
     model: str
@@ -28,20 +32,23 @@ class OpenAIChatCompletionForm(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-
+# representation of the OpenAI Model response data item
+# https://platform.openai.com/docs/api-reference/models
 class OpenAIModel(BaseModel):
     id: str
     object: str
     created: int
     owned_by: str
 
-
+# OpenAI chat completion response data for choices items
+# https://platform.openai.com/docs/api-reference/chat/object#chat/object-choices
 class OpenAIChatChoice(BaseModel):
     index: int
     message: OpenAIChatMessage
     finish_reason: str | None
 
-
+# OpenAI chat completion response object 
+# https://platform.openai.com/docs/api-reference/chat/object
 class OpenAIChatCompletionResponse(BaseModel):
     id: str
     object: str
@@ -49,18 +56,21 @@ class OpenAIChatCompletionResponse(BaseModel):
     model: str
     choices: List[OpenAIChatChoice]
 
-
+# OpenAI chat completion streaming detla object within response choices 
+# https://platform.openai.com/docs/api-reference/chat/streaming#chat/streaming-choices
 class OpenAIChatDelta(BaseModel):
     role: Optional[str] = None
     content: Optional[str] = None
     finish_reason: Optional[str] = None
 
-
+# OpenAI chat completion streaming response choices
+# https://platform.openai.com/docs/api-reference/chat/streaming#chat/streaming-choices
 class OpenAIChatChunkChoice(BaseModel):
     index: int
     delta: OpenAIChatDelta
 
-
+# OpenAI chat completion streaming response object
+# https://platform.openai.com/docs/api-reference/chat/streaming
 class OpenAIChatCompletionChunkResponse(BaseModel):
     id: str
     object: str
