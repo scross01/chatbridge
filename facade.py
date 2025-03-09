@@ -1,6 +1,7 @@
 import oci
 import datetime
 import json
+import logging
 import sys
 import uuid
 
@@ -15,13 +16,19 @@ from schema import (
     OpenAIChatChoice,
     OpenAIChatCompletionForm,
     OpenAIChatCompletionResponse,
+    OpenAIEmbeddingsObject,
     OpenAIModel,
     OpenAIChatDelta,
     OpenAIChatChunkChoice,
     OpenAIChatCompletionChunkResponse,
+    OpenAIEmbeddingsForm,
+    OpenAIEmbeddingsResponse,
 )
 
 app = FastAPI()
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # XXX
 profile_name = "ocicpm"
@@ -42,7 +49,7 @@ inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(
 @app.get("/v1/models")
 async def get_models():
 
-    response = generative_ai_client.list_models(
+    resp = generative_ai_client.list_models(
         config["tenancy"],
         lifecycle_state="ACTIVE",
         capability=["CHAT"],  # NOTE: this filter has no effect - BUG?
@@ -50,11 +57,13 @@ async def get_models():
         sort_order="ASC",  # NOTE: this option has no effect - BUG?
     )
 
+    logger.debug(resp.data)
+
     # filter the response
     # limit to only the active chat models
     # TODO getting multiple models with the same name
     chat_models = []
-    for model in response.data.items:
+    for model in resp.data.items:
         if model.lifecycle_state == "ACTIVE" and "CHAT" in model.capabilities:
             item = OpenAIModel(
                 id=model.display_name,
@@ -64,10 +73,14 @@ async def get_models():
             )
             chat_models.append(item)
 
-    return {
+    response = {
         "object": "list",
         "data": chat_models,
     }
+
+    logger.debug(chat_models)
+
+    return response
 
 
 # Open AI compatible API endpoint for chat completions
@@ -75,6 +88,7 @@ async def get_models():
 @app.post("/chat/completions")
 @app.post("/v1/chat/completions")
 async def chat_completions(form_data: OpenAIChatCompletionForm):
+
     if form_data.model.startswith("meta."):
         return meta_chat_completions(form_data=form_data)
     elif form_data.model.startswith("cohere."):
@@ -85,6 +99,8 @@ async def chat_completions(form_data: OpenAIChatCompletionForm):
 
 
 def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
+
+    logger.debug(form_data)
 
     serving_mode = oci.generative_ai_inference.models.OnDemandServingMode(
         serving_type="ON_DEMAND",
@@ -149,34 +165,38 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
         chat_request=chat_request,
     )
 
-    response = inference_client.chat(chat_details=chat_details)
+    resp = inference_client.chat(chat_details=chat_details)
 
     if form_data.stream:
         # re-stream the response
-        return EventSourceResponse(cohere_restreamer(response, form_data.model))
+        return EventSourceResponse(cohere_restreamer(resp, form_data.model))
     else:
         # convert response format.
         # only use the last item from the chat history
         choices = []
-        item = response.data.chat_response.chat_history[-1]
+        item = resp.data.chat_response.chat_history[-1]
         choices.append(
             OpenAIChatChoice(
                 message=OpenAIChatMessage(
                     role=item.role.lower() if item.role != "CHATBOT" else "assistant",
                     content=item.message,
                 ),
-                finish_reason=response.data.chat_response.finish_reason,
+                finish_reason=resp.data.chat_response.finish_reason,
                 index=0,
             )
         )
 
-        return OpenAIChatCompletionResponse(
-            id=f"{response.data.model_id}-{str(uuid.uuid4())}",
+        response = OpenAIChatCompletionResponse(
+            id=f"{resp.data.model_id}-{str(uuid.uuid4())}",
             object="chat.completion",
             created=int(datetime.datetime.now().timestamp()),
-            model=response.data.model_id,
+            model=resp.data.model_id,
             choices=choices,
         )
+
+        logger.info(response)
+
+        return response
 
 
 def meta_chat_completions(form_data: OpenAIChatCompletionForm):
@@ -220,15 +240,15 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
         chat_request=chat_request,
     )
 
-    response = inference_client.chat(chat_details=chat_details)
+    resp = inference_client.chat(chat_details=chat_details)
 
     if form_data.stream:
         # re-stream the response
-        return EventSourceResponse(meta_restreamer(response, form_data.model))
+        return EventSourceResponse(meta_restreamer(resp, form_data.model))
     else:
         # convert response format
         choices = []
-        for choice in response.data.chat_response.choices:
+        for choice in resp.data.chat_response.choices:
             choices.append(
                 OpenAIChatChoice(
                     index=choice.index,
@@ -240,13 +260,16 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
                 )
             )
 
-        return OpenAIChatCompletionResponse(
-            id=f"{response.data.model_id}-{str(uuid.uuid4())}",
+        response = OpenAIChatCompletionResponse(
+            id=f"{resp.data.model_id}-{str(uuid.uuid4())}",
             object="chat.completion",
-            created=int(response.data.chat_response.time_created.timestamp()),
-            model=response.data.model_id,
+            created=int(resp.data.chat_response.time_created.timestamp()),
+            model=resp.data.model_id,
             choices=choices,
         )
+
+        logger.debug(response)
+        return response
 
 
 # response re-streamer
@@ -312,10 +335,10 @@ async def meta_restreamer(response, model):
                 )
                 yield finish.model_dump_json()
     except ValidationError as ve:
-        print("ValidationError", ve, event.data)
+        logger.error(f"ValidationError {ve}, {event.data}")
     except:  # TODO
         e = sys.exc_info()[0]
-        print("Exception", e, event.data)
+        logger.error(f"Exception {e}, {event.data}")
         pass
 
 
@@ -358,8 +381,62 @@ async def cohere_restreamer(response, model):
                 )
                 yield message.model_dump_json()
     except ValidationError as ve:
-        print("ValidationError", ve, event.data)
+        logger.error(f"ValidationError {ve}, {event.data}")
     except:  # TODO
         e = sys.exc_info()[0]
-        print("Exception", e, event.data)
+        logger.error(f"Exception {e}, {event.data}")
         pass
+
+
+# Open AI compatible API endpoint for embeddings
+# https://platform.openai.com/docs/api-reference/embeddings
+@app.post("/embeddings")
+@app.post("/v1/embeddings")
+async def embeddings(form_data: OpenAIEmbeddingsForm) -> OpenAIEmbeddingsResponse:
+
+    logger.debug(form_data)
+
+    # When using embeddings for semantic search
+    # - the search query should be embedded by setting input_type="search_query"
+    # - the text passages that are being searched over should be embedded with input_type="search_document".
+    input_type = (
+        "SEARCH_DOCUMENT"
+        if form_data.input[0].startswith("<document_metadata>")
+        else "SEARCH_QUERY"
+    )
+
+    embed_text_details = oci.generative_ai_inference.models.EmbedTextDetails(
+        inputs=form_data.input if type(form_data.input) == list else [form_data.input],
+        serving_mode=oci.generative_ai_inference.models.OnDemandServingMode(
+            serving_type=oci.generative_ai_inference.models.ServingMode.SERVING_TYPE_ON_DEMAND,
+            model_id=form_data.model,
+        ),
+        compartment_id=config["tenancy"],
+        is_echo=False,
+        truncate="END",  # “NONE”, “START”, “END”
+        input_type=input_type,  # “SEARCH_DOCUMENT”, “SEARCH_QUERY”, “CLASSIFICATION”, “CLUSTERING”, “IMAGE”
+    )
+
+    resp = inference_client.embed_text(embed_text_details=embed_text_details)
+
+    logger.debug(resp.data)
+
+    # Extract embeddings from response
+    embeddings = resp.data.embeddings
+
+    response = OpenAIEmbeddingsResponse(
+        object="list",
+        data=[
+            OpenAIEmbeddingsObject(
+                object="embedding",
+                index=0,
+                embedding=embeddings[0],
+            )
+        ],
+        model=resp.data.model_id,
+        usage={},
+    )
+
+    logger.debug(response)
+
+    return response

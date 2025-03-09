@@ -26,15 +26,15 @@ not working:
 
 ## Roadmap
 
-BUG cohere and meta models are not getting the correct `end` event. need to manually stop
-TODO rename from facade to adapter to correctly represent the adapter pattern
 DONE add support for streaming responses
 - DONE streaming for meta models
 - DONE streaming for cohere models
-TODO add support for embedding models
+DONE add support for embedding models
+DONE add debug logging
+
+TODO rename from facade to adapter to correctly represent the adapter pattern
 TODO add support for images
 TODO add support for documents and RAG
 TODO add support for tool calling
-TODO add debug logging
 TODO add support for dotenv config
 TODO add command line options

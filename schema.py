@@ -1,5 +1,3 @@
-# from https://github.com/open-webui/pipelines/blob/main/schemas.py
-
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
@@ -32,6 +30,7 @@ class OpenAIChatCompletionForm(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
+
 # representation of the OpenAI Model response data item
 # https://platform.openai.com/docs/api-reference/models
 class OpenAIModel(BaseModel):
@@ -40,6 +39,7 @@ class OpenAIModel(BaseModel):
     created: int
     owned_by: str
 
+
 # OpenAI chat completion response data for choices items
 # https://platform.openai.com/docs/api-reference/chat/object#chat/object-choices
 class OpenAIChatChoice(BaseModel):
@@ -47,7 +47,8 @@ class OpenAIChatChoice(BaseModel):
     message: OpenAIChatMessage
     finish_reason: str | None
 
-# OpenAI chat completion response object 
+
+# OpenAI chat completion response object
 # https://platform.openai.com/docs/api-reference/chat/object
 class OpenAIChatCompletionResponse(BaseModel):
     id: str
@@ -56,18 +57,21 @@ class OpenAIChatCompletionResponse(BaseModel):
     model: str
     choices: List[OpenAIChatChoice]
 
-# OpenAI chat completion streaming detla object within response choices 
+
+# OpenAI chat completion streaming detla object within response choices
 # https://platform.openai.com/docs/api-reference/chat/streaming#chat/streaming-choices
 class OpenAIChatDelta(BaseModel):
     role: Optional[str] = None
     content: Optional[str] = None
     finish_reason: Optional[str] = None
 
+
 # OpenAI chat completion streaming response choices
 # https://platform.openai.com/docs/api-reference/chat/streaming#chat/streaming-choices
 class OpenAIChatChunkChoice(BaseModel):
     index: int
     delta: OpenAIChatDelta
+
 
 # OpenAI chat completion streaming response object
 # https://platform.openai.com/docs/api-reference/chat/streaming
@@ -77,3 +81,30 @@ class OpenAIChatCompletionChunkResponse(BaseModel):
     created: int
     model: str
     choices: List[OpenAIChatChunkChoice]
+
+
+# OpenAI embeddings form data
+# https://platform.openai.com/docs/api-reference/embeddings/create
+class OpenAIEmbeddingsForm(BaseModel):
+    input: str | List[str] | List[float]
+    model: str
+    encoding_format: Optional[str] = "float"
+
+    model_config = ConfigDict(extra="allow")
+
+
+# OpenAI embeddings object
+# https://platform.openai.com/docs/api-reference/embeddings/object
+class OpenAIEmbeddingsObject(BaseModel):
+    object: str
+    embedding: List[float]
+    index: int
+
+
+# OpenAI embeddings response data
+# https://platform.openai.com/docs/api-reference/embeddings/create
+class OpenAIEmbeddingsResponse(BaseModel):
+    object: str
+    data: List[OpenAIEmbeddingsObject]
+    model: str
+    usage: dict
