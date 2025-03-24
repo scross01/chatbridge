@@ -27,7 +27,7 @@ from schema import (
 
 app = FastAPI()
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # XXX
@@ -202,16 +202,36 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
 def meta_chat_completions(form_data: OpenAIChatCompletionForm):
     # convert message format
     messages = []
+
     for message in form_data.messages:
+        content = []
+        if type(message.content) is str:
+            content.append(
+                oci.generative_ai_inference.models.TextContent(
+                    type="TEXT",
+                    text=message.content,
+                )
+            )
+        elif type(message.content) is list:
+            for item in message.content:
+                if item["type"] == "text":
+                    content.append(
+                        oci.generative_ai_inference.models.TextContent(
+                            type="TEXT",
+                            text=item["text"],
+                        )
+                    )
+                else:
+                    logger.error(f'unsupported message content type {item["type"]}')
+        else:
+            logger.error(
+                f"unexpected message content colletion {type(message.content)}"
+            )
+
         messages.append(
             oci.generative_ai_inference.models.UserMessage(
                 role=message.role.upper(),
-                content=[
-                    oci.generative_ai_inference.models.TextContent(
-                        type="TEXT",
-                        text=message.content,
-                    )
-                ],
+                content=content,
             )
         )
 
