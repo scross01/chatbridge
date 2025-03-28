@@ -61,10 +61,11 @@ async def get_models():
 
     # filter the response
     # limit to only the active chat models
-    # TODO getting multiple models with the same name
     chat_models = []
     for model in resp.data.items:
-        if model.lifecycle_state == "ACTIVE" and "CHAT" in model.capabilities:
+        # Note: filter for exactly ["CHAT"], not just contains "CHAT",
+        # otherwise model names are repeated.
+        if model.lifecycle_state == "ACTIVE" and model.capabilities == ["CHAT"]:
             item = OpenAIModel(
                 id=model.display_name,
                 object="model",

@@ -16,21 +16,8 @@ working:
 - `cohere.command-r-08-2024`
 - `cohere.command-r-plus-08-2024`
 
-not working:
-
-- Entity with key `meta.llama-3-70b-instruct` not found
-- Entity with key `meta.llama-3.1-405b-instruct` not found
-- Entity with key `meta.llama-3.2-11b-vision-instruct` not found
-- Entity with key `cohere.command-r-plus` not found
-- Entity with key `cohere.command-r-16k` not found
 
 ## Roadmap
-
-DONE add support for streaming responses
-- DONE streaming for meta models
-- DONE streaming for cohere models
-DONE add support for embedding models
-DONE add debug logging
 
 TODO rename from facade to adapter to correctly represent the adapter pattern
 TODO add support for images
