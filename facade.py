@@ -96,6 +96,7 @@ async def chat_completions(form_data: OpenAIChatCompletionForm):
         return cohere_chat_completions(form_data=form_data)
     else:
         # unsupported model type
+        logger.error(f"Unsupported model {form_data.model}")
         return
 
 
@@ -169,9 +170,11 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
     resp = inference_client.chat(chat_details=chat_details)
 
     if form_data.stream:
+        logger.info("Processing streaming response events")
         # re-stream the response
         return EventSourceResponse(cohere_restreamer(resp, form_data.model))
     else:
+        logger.info("Converting from Cohere response format")
         # convert response format.
         # only use the last item from the chat history
         choices = []
@@ -195,12 +198,15 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
             choices=choices,
         )
 
-        logger.info(response)
+        logger.debug(response)
 
         return response
 
 
 def meta_chat_completions(form_data: OpenAIChatCompletionForm):
+
+    logger.debug(form_data)
+
     # convert message format
     messages = []
 
@@ -264,9 +270,11 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
     resp = inference_client.chat(chat_details=chat_details)
 
     if form_data.stream:
+        logger.info("Processing streaming response events")
         # re-stream the response
         return EventSourceResponse(meta_restreamer(resp, form_data.model))
     else:
+        logger.info("Converting from Generic response format")
         # convert response format
         choices = []
         for choice in resp.data.chat_response.choices:
@@ -290,6 +298,7 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
         )
 
         logger.debug(response)
+
         return response
 
 
@@ -440,10 +449,10 @@ async def embeddings(form_data: OpenAIEmbeddingsForm) -> OpenAIEmbeddingsRespons
 
     resp = inference_client.embed_text(embed_text_details=embed_text_details)
 
-    logger.debug(resp.data)
-
     # Extract embeddings from response
     embeddings = resp.data.embeddings
+
+    logger.info("Converting from Embedding response format")
 
     response = OpenAIEmbeddingsResponse(
         object="list",
