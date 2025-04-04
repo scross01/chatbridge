@@ -29,13 +29,13 @@ oci setup bootstrap
 ## Usage
 
 ```shell
-uvicorn facade:app --reload
+uvicorn main:app --reload
 ```
 
 By default the API will start on http://127.0.0.1:8000. To run on an alternative interface and port you can specify them as follows:
 
 ```shell
-uvicorn facade:app --reload --host 0.0.0.0 --port 8080
+uvicorn main:app --reload --host 0.0.0.0 --port 8080
 ```
 
 > CAUTION: running the API on 0.0.0.0 exposes the API server to other machines on your local network and potentially the internet. Anyone with access to the URL will have direct access to you OCI Gen AI service. Ensure that you have appropriate security measures in place to limit access.
@@ -51,7 +51,6 @@ uvicorn facade:app --reload --host 0.0.0.0 --port 8080
 
 ## Roadmap
 
-- TODO rename from facade to adapter to correctly represent the adapter pattern
 - TODO add support for images
 - TODO add support for documents and RAG
 - TODO add support for tool calling
