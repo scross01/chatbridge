@@ -32,8 +32,6 @@ dotenv.load_dotenv()
 config_file = os.getenv("OCI_CONFIG_FILE", "~/.oci/config")
 config_profile = os.getenv("OCI_CONFIG_PROFILE", "DEFAULT")
 region = os.getenv("OCI_CONFIG_REGION", None)
-host = os.getenv("LOCAL_API_HOST", "127.0.0.1")
-port = os.getenv("LOCAL_API_PORT", "8000")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -240,6 +238,17 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
                         oci.generative_ai_inference.models.TextContent(
                             type="TEXT",
                             text=item["text"],
+                        )
+                    )
+                elif item["type"] == "image_url":
+                    image_url_data = item["image_url"]["url"]
+                    content.append(
+                        oci.generative_ai_inference.models.ImageContent(
+                            type="IMAGE",
+                            image_url= oci.generative_ai_inference.models.ImageUrl(
+                                url=image_url_data,
+                                detail=oci.generative_ai_inference.models.ImageUrl.DETAIL_AUTO
+                            ),
                         )
                     )
                 else:
