@@ -1,7 +1,9 @@
 import oci
 import datetime
+import dotenv
 import json
 import logging
+import os
 import sys
 import uuid
 
@@ -25,23 +27,35 @@ from schema import (
     OpenAIEmbeddingsResponse,
 )
 
-app = FastAPI()
+dotenv.load_dotenv()
+
+config_file = os.getenv("OCI_CONFIG_FILE", "~/.oci/config")
+config_profile = os.getenv("OCI_CONFIG_PROFILE", "DEFAULT")
+region = os.getenv("OCI_CONFIG_REGION", None)
+host = os.getenv("LOCAL_API_HOST", "127.0.0.1")
+port = os.getenv("LOCAL_API_PORT", "8000")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# XXX
-profile_name = "ocicpm"
-region = "uk-london-1"
+app = FastAPI(
+    debug=False,
+    title="OpenAI Compatible API",
+    description="A FastAPI application that provides a local OpenAI compatible API interface to the OCI Generative AI service.",
+    version="0.1.0",
+)
 
-# TODO get from config file or environment
-config = oci.config.from_file(profile_name=profile_name)
-config["region"] = region
+# load the OCI configuration profile
+config = oci.config.from_file(file_location=config_file, profile_name=config_profile)
+if region:
+    # overide the region if set
+    config["region"] = region
+
+# create the OCI clients
 generative_ai_client = oci.generative_ai.GenerativeAiClient(config=config)
 inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(
     config=config
 )
-
 
 # Open AI compatible API endpoint to fetch list of supported models
 # https://platform.openai.com/docs/api-reference/models

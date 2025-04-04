@@ -4,3 +4,4 @@ uvicorn
 pydantic
 python-multipart
 sse_starlette
+dotenv
