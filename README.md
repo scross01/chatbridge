@@ -52,6 +52,5 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8080
 ## Roadmap
 
 - TODO add support for documents and RAG
-- TODO add support for tool calling
 - TODO add command line options
 - TODO add API token bearer authentication

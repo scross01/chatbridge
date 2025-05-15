@@ -16,15 +16,16 @@ from sse_starlette import EventSourceResponse
 from schema import (
     OpenAIChatMessage,
     OpenAIChatChoice,
-    OpenAIChatCompletionForm,
-    OpenAIChatCompletionResponse,
-    OpenAIEmbeddingsObject,
-    OpenAIModel,
-    OpenAIChatDelta,
     OpenAIChatChunkChoice,
     OpenAIChatCompletionChunkResponse,
+    OpenAIChatCompletionForm,
+    OpenAIChatCompletionResponse,
+    OpenAIChatDelta,
     OpenAIEmbeddingsForm,
+    OpenAIEmbeddingsObject,
     OpenAIEmbeddingsResponse,
+    OpenAPIFunctionCall,
+    OpenAIModel,
 )
 
 dotenv.load_dotenv()
@@ -33,7 +34,7 @@ config_file = os.getenv("OCI_CONFIG_FILE", "~/.oci/config")
 config_profile = os.getenv("OCI_CONFIG_PROFILE", "DEFAULT")
 region = os.getenv("OCI_CONFIG_REGION", None)
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -102,6 +103,8 @@ async def get_models():
 @app.post("/v1/chat/completions")
 async def chat_completions(form_data: OpenAIChatCompletionForm):
 
+    logger.debug(form_data)
+
     if form_data.model.startswith("meta."):
         return meta_chat_completions(form_data=form_data)
     elif form_data.model.startswith("cohere."):
@@ -113,8 +116,6 @@ async def chat_completions(form_data: OpenAIChatCompletionForm):
 
 
 def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
-
-    logger.debug(form_data)
 
     serving_mode = oci.generative_ai_inference.models.OnDemandServingMode(
         serving_type="ON_DEMAND",
@@ -184,7 +185,7 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
     if form_data.stream:
         logger.info("Processing streaming response events")
         # re-stream the response
-        return EventSourceResponse(cohere_restreamer(resp, form_data.model))
+        return EventSourceResponse(cohere_restreamer(resp, form_data.model))  # type: ignore
     else:
         logger.info("Converting from Cohere response format")
         # convert response format.
@@ -217,8 +218,6 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
 
 def meta_chat_completions(form_data: OpenAIChatCompletionForm):
 
-    logger.debug(form_data)
-
     # convert message format
     messages = []
 
@@ -245,9 +244,9 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
                     content.append(
                         oci.generative_ai_inference.models.ImageContent(
                             type="IMAGE",
-                            image_url= oci.generative_ai_inference.models.ImageUrl(
+                            image_url=oci.generative_ai_inference.models.ImageUrl(
                                 url=image_url_data,
-                                detail=oci.generative_ai_inference.models.ImageUrl.DETAIL_AUTO
+                                detail=oci.generative_ai_inference.models.ImageUrl.DETAIL_AUTO,
                             ),
                         )
                     )
@@ -283,6 +282,19 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
         presence_penalty=form_data.presence_penalty,
         stop=form_data.stop,
     )
+
+    tools = []
+    if form_data.tools:
+        for tool in form_data.tools:
+            tools.append(
+                oci.generative_ai_inference.models.FunctionDefinition(
+                    type="FUNCTION",
+                    name=tool.function.name,
+                    description=tool.function.description,
+                    parameters=tool.function.parameters,
+                )
+            )
+        chat_request.tools = tools
 
     chat_details = oci.generative_ai_inference.models.ChatDetails(
         compartment_id=config["tenancy"],
@@ -334,6 +346,8 @@ async def meta_restreamer(response, model):
         for event in response.data.events():
             chunk = json.loads(event.data)
 
+            logger.info(f"chunk: {chunk}")
+
             if "message" in chunk:
                 if first_event:
                     # send just the role first as a separate chunk
@@ -355,23 +369,70 @@ async def meta_restreamer(response, model):
                     first_event = False
                     yield message.model_dump_json()
 
-                # send message content
-                message = OpenAIChatCompletionChunkResponse(
-                    id=id,
-                    object="chat.completion.chunk",
-                    created=int(datetime.datetime.now().timestamp()),
-                    model=model,
-                    choices=[
-                        OpenAIChatChunkChoice(
-                            index=0,
-                            delta=OpenAIChatDelta(
-                                content=chunk["message"]["content"][0]["text"],
-                                finish_reason=None,
-                            ),
+                if "content" in chunk["message"]:
+                    # send message content
+                    message = OpenAIChatCompletionChunkResponse(
+                        id=id,
+                        object="chat.completion.chunk",
+                        created=int(datetime.datetime.now().timestamp()),
+                        model=model,
+                        choices=[
+                            OpenAIChatChunkChoice(
+                                index=0,
+                                delta=OpenAIChatDelta(
+                                    content=chunk["message"]["content"][0]["text"],
+                                    finish_reason=None,
+                                ),
+                            )
+                        ],
+                    )
+                    yield message.model_dump_json()
+                elif "toolCalls" in chunk["message"]:
+                    # send tool call
+                    # INFO:main:chunk: {'index': 0, 'message': {'role': 'ASSISTANT', 'toolCalls': [{'type': 'FUNCTION', 'arguments': '{"url": "'}]}, 'pad': 'aa'}
+                    # [{"index": 0, "id": "call_DdmO9pD3xa9XTPNJ32zg2hcA", "function": {"arguments": "", "name": "get_weather"}, "type": "function"}]
+                    # [{"index": 0, "id": null, "function": {"arguments": "{\"", "name": null}, "type": null}]
+                    tool_calls = []
+                    index = 0
+                    for tool_call in chunk["message"]["toolCalls"]:
+                        function = dict()
+                        if "name" in tool_call:
+                            function["name"] = tool_call["name"]
+                        if "arguments" in tool_call:
+                            function["arguments"] = tool_call["arguments"]
+
+                        tool_calls.append(
+                            OpenAPIFunctionCall(
+                                index=index,
+                                id=tool_call["id"] if "name" in tool_call else None,
+                                function=function,
+                                type="function" if "name" in tool_call else None,
+                            )
                         )
-                    ],
-                )
-                yield message.model_dump_json()
+                        index += 1
+
+                    # if the tool call is empty, set to None
+                    if (
+                        len(tool_calls) == 1
+                        and tool_calls[0].id is None
+                        and tool_calls[0].type is None
+                        and tool_calls[0].function["arguments"] == ""
+                    ):
+                        tool_calls = None
+
+                    message = OpenAIChatCompletionChunkResponse(
+                        id=id,
+                        object="chat.completion.chunk",
+                        created=int(datetime.datetime.now().timestamp()),
+                        model=model,
+                        choices=[
+                            OpenAIChatChunkChoice(
+                                index=0, delta=OpenAIChatDelta(tool_calls=tool_calls)
+                            )
+                        ],
+                    )
+                    logger.info(f"message: {message.model_dump_json()}")
+                    yield message.model_dump_json()
             elif "finishReason" in chunk:
                 finish = OpenAIChatCompletionChunkResponse(
                     id=id,
@@ -459,7 +520,7 @@ async def embeddings(form_data: OpenAIEmbeddingsForm) -> OpenAIEmbeddingsRespons
     )
 
     embed_text_details = oci.generative_ai_inference.models.EmbedTextDetails(
-        inputs=form_data.input if type(form_data.input) == list else [form_data.input],
+        inputs=form_data.input if form_data.input is list else [form_data.input],
         serving_mode=oci.generative_ai_inference.models.OnDemandServingMode(
             serving_type=oci.generative_ai_inference.models.ServingMode.SERVING_TYPE_ON_DEMAND,
             model_id=form_data.model,

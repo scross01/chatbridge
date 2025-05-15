@@ -11,8 +11,23 @@ class OpenAIChatMessage(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+# OpenAI function definition object
+# https://platform.openai.com/docs/api-reference/chat/create
+class OpenAIFunctionDefinition(BaseModel):
+    name: str
+    description: Optional[str]
+    parameters: Optional[dict]
+    strict: Optional[bool] = False
+
+# OpenAI tool definition object
+# https://platform.openai.com/docs/api-reference/chat/create
+class OpenAIToolDefintion(BaseModel):
+    function: OpenAIFunctionDefinition
+    type: str
+
+
 # representation of an OpenAI Chat request
-# https://platform.openai.com/docs/api-reference/chat
+# https://platform.openai.com/docs/api-reference/chat/create
 class OpenAIChatCompletionForm(BaseModel):
     stream: bool = True
     model: str
@@ -27,7 +42,8 @@ class OpenAIChatCompletionForm(BaseModel):
     frequency_penalty: Optional[float] = None
     presence_penalty: Optional[float] = None
     stop: Optional[List[str]] = None
-
+    tools: Optional[List[OpenAIToolDefintion]] = None
+    
     model_config = ConfigDict(extra="allow")
 
 
@@ -58,12 +74,24 @@ class OpenAIChatCompletionResponse(BaseModel):
     choices: List[OpenAIChatChoice]
 
 
+# OpenAI chat completion streaming delta for tool calls
+# https://platform.openai.com/docs/guides/function-calling#streaming
+class OpenAPIFunctionCall(BaseModel):
+    # [{"index": 0, "id": "call_DdmO9pD3xa9XTPNJ32zg2hcA", "function": {"arguments": "", "name": "get_weather"}, "type": "function"}]
+    # [{"index": 0, "id": null, "function": {"arguments": "{\"", "name": null}, "type": null}]
+    index: int
+    id: str | None
+    function: dict
+    type: str | None
+
+
 # OpenAI chat completion streaming detla object within response choices
 # https://platform.openai.com/docs/api-reference/chat/streaming#chat/streaming-choices
 class OpenAIChatDelta(BaseModel):
     role: Optional[str] = None
     content: Optional[str] = None
     finish_reason: Optional[str] = None
+    tool_calls: Optional[List[OpenAPIFunctionCall]] = None
 
 
 # OpenAI chat completion streaming response choices
@@ -71,6 +99,7 @@ class OpenAIChatDelta(BaseModel):
 class OpenAIChatChunkChoice(BaseModel):
     index: int
     delta: OpenAIChatDelta
+    finish_reason: Optional[str] = None
 
 
 # OpenAI chat completion streaming response object
