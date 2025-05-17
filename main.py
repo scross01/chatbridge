@@ -34,7 +34,7 @@ config_file = os.getenv("OCI_CONFIG_FILE", "~/.oci/config")
 config_profile = os.getenv("OCI_CONFIG_PROFILE", "DEFAULT")
 region = os.getenv("OCI_CONFIG_REGION", None)
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -346,7 +346,7 @@ async def meta_restreamer(response, model):
         for event in response.data.events():
             chunk = json.loads(event.data)
 
-            logger.info(f"chunk: {chunk}")
+            logger.debug(f"chunk: {chunk}")
 
             if "message" in chunk:
                 if first_event:
@@ -431,7 +431,7 @@ async def meta_restreamer(response, model):
                             )
                         ],
                     )
-                    logger.info(f"message: {message.model_dump_json()}")
+                    logger.debug(f"message: {message.model_dump_json()}")
                     yield message.model_dump_json()
             elif "finishReason" in chunk:
                 finish = OpenAIChatCompletionChunkResponse(
