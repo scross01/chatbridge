@@ -49,8 +49,10 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8080
 
 - `/docs` - API documentation
 
-## Roadmap
+## Debugging
 
-- TODO add support for documents and RAG
-- TODO add command line options
-- TODO add API token bearer authentication
+The following environment variables can be used to enable debugging, set to `true` to enable. Default is `false`.
+
+- `DEBUG` - Enable general debug logs
+- `DEBUG_OCI_SDK` - Enable OCI SDK debug logs
+- `DEBUG_SSE_STARLETTE` - Enable SSE Starlette debug logs

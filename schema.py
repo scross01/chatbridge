@@ -19,6 +19,7 @@ class OpenAIFunctionDefinition(BaseModel):
     parameters: Optional[dict]
     strict: Optional[bool] = False
 
+
 # OpenAI tool definition object
 # https://platform.openai.com/docs/api-reference/chat/create
 class OpenAIToolDefintion(BaseModel):

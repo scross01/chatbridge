@@ -10,7 +10,6 @@ import uuid
 from fastapi import FastAPI
 from pydantic import ValidationError
 
-# from fastapi.responses import StreamingResponse
 from sse_starlette import EventSourceResponse
 
 from schema import (
@@ -34,13 +33,23 @@ config_file = os.getenv("OCI_CONFIG_FILE", "~/.oci/config")
 config_profile = os.getenv("OCI_CONFIG_PROFILE", "DEFAULT")
 region = os.getenv("OCI_CONFIG_REGION", None)
 
+debug = os.getenv("DEBUG", "false").lower() == "true"
+debug_oci = os.getenv("DEBUG_OCI_SDK", "false").lower() == "true"  # enables OCI SDK debug logging
+debug_sse = os.getenv("DEBUG_SSE_STARLETTE", "false").lower() == "true"  # enables SSE Starlette library debug logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+logger.setLevel(logging.DEBUG if debug else logging.INFO)
+logging.getLogger("oci").setLevel(logging.DEBUG if debug_oci else logging.INFO)
+logging.getLogger("sse_starlette").setLevel(logging.DEBUG if debug_sse else logging.INFO)
 
 app = FastAPI(
     debug=False,
     title="OpenAI Compatible API",
-    description="A FastAPI application that provides a local OpenAI compatible API interface to the OCI Generative AI service.",
+    description="""
+    A FastAPI application that provides a local OpenAI compatible API interface to the OCI Generative AI services.
+    """,
     version="0.1.0",
 )
 
@@ -55,6 +64,7 @@ generative_ai_client = oci.generative_ai.GenerativeAiClient(config=config)
 inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(
     config=config
 )
+
 
 # Open AI compatible API endpoint to fetch list of supported models
 # https://platform.openai.com/docs/api-reference/models
@@ -115,8 +125,8 @@ async def chat_completions(form_data: OpenAIChatCompletionForm):
         return
 
 
+# Handle Cohere chat completions
 def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
-
     serving_mode = oci.generative_ai_inference.models.OnDemandServingMode(
         serving_type="ON_DEMAND",
         model_id=form_data.model,
@@ -180,7 +190,15 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
         chat_request=chat_request,
     )
 
-    resp = inference_client.chat(chat_details=chat_details)
+    logger.debug(f"chat_details: {chat_details}")
+
+    try:
+        resp = inference_client.chat(chat_details=chat_details)
+    except oci.exceptions.ServiceError as se:
+        logger.error(f"ServiceError {se}")
+        return {
+            "error": {"code": se.code, "message": se.message}
+        }
 
     if form_data.stream:
         logger.info("Processing streaming response events")
@@ -216,11 +234,10 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
         return response
 
 
+# Handle Meta chat completions
 def meta_chat_completions(form_data: OpenAIChatCompletionForm):
-
     # convert message format
     messages = []
-
     for message in form_data.messages:
         content = []
         if type(message.content) is str:
@@ -302,7 +319,15 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
         chat_request=chat_request,
     )
 
-    resp = inference_client.chat(chat_details=chat_details)
+    logger.debug(f"chat_details: {chat_details}")
+
+    try:
+        resp = inference_client.chat(chat_details=chat_details)
+    except oci.exceptions.ServiceError as se:
+        logger.error(f"ServiceError {se}")
+        return {
+            "error": {"code": se.code, "message": se.message}
+        }
 
     if form_data.stream:
         logger.info("Processing streaming response events")
@@ -332,22 +357,22 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
             choices=choices,
         )
 
-        logger.debug(response)
+        logger.debug(f"response: {response}")
 
         return response
 
 
-# response re-streamer
+# Meta response re-streamer
+# convert and re-stream the response event stream back to the client
 # https://platform.openai.com/docs/api-reference/chat/streaming
 async def meta_restreamer(response, model):
     try:
+        content = ""
         id = f"chatcmpl-{str(uuid.uuid4())}"
         first_event = True
         for event in response.data.events():
             chunk = json.loads(event.data)
-
             logger.debug(f"chunk: {chunk}")
-
             if "message" in chunk:
                 if first_event:
                     # send just the role first as a separate chunk
@@ -369,9 +394,9 @@ async def meta_restreamer(response, model):
                     first_event = False
                     yield message.model_dump_json()
 
-                if "content" in chunk["message"]:
-                    # send message content
-                    message = OpenAIChatCompletionChunkResponse(
+                # continue with same event based on event type
+                if "finishReason" in chunk:
+                    finish = OpenAIChatCompletionChunkResponse(
                         id=id,
                         object="chat.completion.chunk",
                         created=int(datetime.datetime.now().timestamp()),
@@ -379,19 +404,15 @@ async def meta_restreamer(response, model):
                         choices=[
                             OpenAIChatChunkChoice(
                                 index=0,
-                                delta=OpenAIChatDelta(
-                                    content=chunk["message"]["content"][0]["text"],
-                                    finish_reason=None,
-                                ),
-                            )
+                                delta=OpenAIChatDelta(),
+                                finish_reason=chunk["finishReason"],
+                            ),
                         ],
                     )
-                    yield message.model_dump_json()
+                    logger.debug(f"finish: {chunk["finishReason"]}, content: {content}")
+                    yield finish.model_dump_json()
                 elif "toolCalls" in chunk["message"]:
                     # send tool call
-                    # INFO:main:chunk: {'index': 0, 'message': {'role': 'ASSISTANT', 'toolCalls': [{'type': 'FUNCTION', 'arguments': '{"url": "'}]}, 'pad': 'aa'}
-                    # [{"index": 0, "id": "call_DdmO9pD3xa9XTPNJ32zg2hcA", "function": {"arguments": "", "name": "get_weather"}, "type": "function"}]
-                    # [{"index": 0, "id": null, "function": {"arguments": "{\"", "name": null}, "type": null}]
                     tool_calls = []
                     index = 0
                     for tool_call in chunk["message"]["toolCalls"]:
@@ -410,7 +431,6 @@ async def meta_restreamer(response, model):
                             )
                         )
                         index += 1
-
                     # if the tool call is empty, set to None
                     if (
                         len(tool_calls) == 1
@@ -431,36 +451,48 @@ async def meta_restreamer(response, model):
                             )
                         ],
                     )
-                    logger.debug(f"message: {message.model_dump_json()}")
+                    logger.debug(f"using tool calls: {tool_calls}")
                     yield message.model_dump_json()
-            elif "finishReason" in chunk:
-                finish = OpenAIChatCompletionChunkResponse(
-                    id=id,
-                    object="chat.completion.chunk",
-                    created=int(datetime.datetime.now().timestamp()),
-                    model=model,
-                    choices=[
-                        OpenAIChatChunkChoice(
-                            index=0,
-                            delta=OpenAIChatDelta(),
-                            finish_reason=chunk["finishReason"],
-                        ),
-                    ],
-                )
-                yield finish.model_dump_json()
+                elif "content" in chunk["message"]:
+                    # send message content
+                    text = chunk["message"]["content"][0]["text"]
+                    content += text
+                    message = OpenAIChatCompletionChunkResponse(
+                        id=id,
+                        object="chat.completion.chunk",
+                        created=int(datetime.datetime.now().timestamp()),
+                        model=model,
+                        choices=[
+                            OpenAIChatChunkChoice(
+                                index=0,
+                                delta=OpenAIChatDelta(
+                                    content=text,
+                                    finish_reason=None,
+                                ),
+                            )
+                        ],
+                    )
+                    yield message.model_dump_json()
+
     except ValidationError as ve:
         logger.error(f"ValidationError {ve}, {event.data}")
+    except oci.exceptions.ServiceError as se:
+        logger.error(f"ServiceError {se}, {event.data}")
     except:  # TODO
         e = sys.exc_info()[0]
         logger.error(f"Exception {e}, {event.data}")
         pass
 
 
+# Cohere response re-streamer
+# convert and re-stream the response event stream back to the client
+# https://platform.openai.com/docs/api-reference/chat/streaming
 async def cohere_restreamer(response, model):
     try:
         id = f"chatcmpl-{str(uuid.uuid4())}"
         for event in response.data.events():
             chunk = json.loads(event.data)
+            logger.debug(f"chunk: {chunk}")
             if "finishReason" in chunk:
                 finish = OpenAIChatCompletionChunkResponse(
                     id=id,
@@ -496,6 +528,8 @@ async def cohere_restreamer(response, model):
                 yield message.model_dump_json()
     except ValidationError as ve:
         logger.error(f"ValidationError {ve}, {event.data}")
+    except oci.exceptions.ServiceError as se:
+        logger.error(f"ServiceError {se}, {event.data}")
     except:  # TODO
         e = sys.exc_info()[0]
         logger.error(f"Exception {e}, {event.data}")
@@ -531,7 +565,10 @@ async def embeddings(form_data: OpenAIEmbeddingsForm) -> OpenAIEmbeddingsRespons
         input_type=input_type,  # “SEARCH_DOCUMENT”, “SEARCH_QUERY”, “CLASSIFICATION”, “CLUSTERING”, “IMAGE”
     )
 
-    resp = inference_client.embed_text(embed_text_details=embed_text_details)
+    try:
+        resp = inference_client.embed_text(embed_text_details=embed_text_details)
+    except oci.exceptions.ServiceError as se:
+        logger.error(f"ServiceError {se}")
 
     # Extract embeddings from response
     embeddings = resp.data.embeddings
