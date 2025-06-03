@@ -554,7 +554,7 @@ async def embeddings(form_data: OpenAIEmbeddingsForm) -> OpenAIEmbeddingsRespons
     )
 
     embed_text_details = oci.generative_ai_inference.models.EmbedTextDetails(
-        inputs=form_data.input if form_data.input is list else [form_data.input],
+        inputs=[form_data.input] if type(form_data.input) == str else form_data.input,
         serving_mode=oci.generative_ai_inference.models.OnDemandServingMode(
             serving_type=oci.generative_ai_inference.models.ServingMode.SERVING_TYPE_ON_DEMAND,
             model_id=form_data.model,
