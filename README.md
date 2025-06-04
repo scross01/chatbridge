@@ -1,15 +1,20 @@
 # OCI GenAI OpenAI Compatible API Adapter
 
-A FastAPI application that provides a local OpenAI compatible API interface to the OCI Generative AI service.
+An OpenAI API compatible adapter to proxy API requests between AI client that support OpenAI API to interface to to the Oracle Generative AI APIs for Cohere and Generic (Meta Llama) chat and embedding model interations.
+
+This FastAPI application provides a local OpenAI compatible API endpoint to proxies requests to to the OCI Generative AI services.
 
 This application allows you to interact with the OCI Generative AI service using a locally hosted API interface, which can be useful quickly connect AI tools and clients that support OpenAI's API interface.
 
 ## Installation
 
-```python
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+Install from source into a local Python virtualenv. Reqiures the [`uv`](https://docs.astral.sh/uv/getting-started/installation/) pacakge manager.
+
+```shell
+git clone https://github.com/scross/oci-generative-ai
+cd oci-generative-ai
+uv venv
+uv sync
 ```
 
 ### OCI API Configuration
@@ -54,5 +59,6 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8080
 The following environment variables can be used to enable debugging, set to `true` to enable. Default is `false`.
 
 - `DEBUG` - Enable general debug logs
+- `TRACE` - Enable additional trace level debug logs 
 - `DEBUG_OCI_SDK` - Enable OCI SDK debug logs
 - `DEBUG_SSE_STARLETTE` - Enable SSE Starlette debug logs
