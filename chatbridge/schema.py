@@ -38,13 +38,16 @@ class OpenAIChatCompletionForm(BaseModel):
     seed: Optional[int] = None
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
+    max_completion_tokens: Optional[int] = None
     top_k: Optional[int] = None
     top_p: Optional[float] = None
     frequency_penalty: Optional[float] = None
     presence_penalty: Optional[float] = None
     stop: Optional[List[str]] = None
     tools: Optional[List[OpenAIToolDefintion]] = None
-    
+    logit_bias: Optional[dict] = None
+    logprobs: Optional[bool] = None
+
     model_config = ConfigDict(extra="allow")
 
 
@@ -78,8 +81,6 @@ class OpenAIChatCompletionResponse(BaseModel):
 # OpenAI chat completion streaming delta for tool calls
 # https://platform.openai.com/docs/guides/function-calling#streaming
 class OpenAPIFunctionCall(BaseModel):
-    # [{"index": 0, "id": "call_DdmO9pD3xa9XTPNJ32zg2hcA", "function": {"arguments": "", "name": "get_weather"}, "type": "function"}]
-    # [{"index": 0, "id": null, "function": {"arguments": "{\"", "name": null}, "type": null}]
     index: int
     id: str | None
     function: dict

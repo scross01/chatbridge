@@ -4,7 +4,6 @@ import dotenv
 import json
 import logging
 import os
-import sys
 import uuid
 
 from fastapi import FastAPI
@@ -12,7 +11,7 @@ from pydantic import ValidationError
 
 from sse_starlette import EventSourceResponse
 
-from schema import (
+from .schema import (
     OpenAIChatMessage,
     OpenAIChatChoice,
     OpenAIChatChunkChoice,
@@ -33,17 +32,25 @@ config_file = os.getenv("OCI_CONFIG_FILE", "~/.oci/config")
 config_profile = os.getenv("OCI_CONFIG_PROFILE", "DEFAULT")
 region = os.getenv("OCI_CONFIG_REGION", None)
 
-trace = os.getenv("TRACE", "false").lower() == "true"  
-debug = trace or os.getenv("DEBUG", "false").lower() == "true"  # trace level logging will enable debug
-debug_oci = os.getenv("DEBUG_OCI_SDK", "false").lower() == "true"  # enables OCI SDK debug logging
-debug_sse = os.getenv("DEBUG_SSE_STARLETTE", "false").lower() == "true"  # enables SSE Starlette library debug logging
+# enables trace level logging
+trace = os.getenv("TRACE", "false").lower() == "true"
+# trace level logging will enable debug
+debug = trace or os.getenv("DEBUG", "false").lower() == "true"
+# enables OCI SDK debug logging
+debug_oci = os.getenv("DEBUG_OCI_SDK", "false").lower() == "true"
+# enables SSE Starlette library debug logging
+debug_sse = os.getenv("DEBUG_SSE_STARLETTE", "false").lower() == "true"
 
+# default logging settngs
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# set component level logging based on the env settings 
 logger.setLevel(logging.DEBUG if debug else logging.INFO)
 logging.getLogger("oci").setLevel(logging.DEBUG if debug_oci else logging.INFO)
-logging.getLogger("sse_starlette").setLevel(logging.DEBUG if debug_sse else logging.INFO)
+logging.getLogger("sse_starlette").setLevel(
+    logging.DEBUG if debug_sse else logging.INFO
+)
 
 app = FastAPI(
     debug=False,
@@ -83,7 +90,7 @@ async def get_models():
         sort_order="ASC",  # NOTE: this option has no effect - BUG?
     )
 
-    logger.debug(resp.data) if trace else None
+    # logger.debug(resp.data) if trace else None
 
     # filter the response
     # limit to only the active chat models
@@ -131,7 +138,9 @@ async def chat_completions(form_data: OpenAIChatCompletionForm):
 # Handle Cohere chat completions
 def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
 
-    logger.info(f"Processing Cohere chat completion request using model {form_data.model}")
+    logger.info(
+        f"Processing Cohere chat completion request using model {form_data.model}"
+    )
 
     serving_mode = oci.generative_ai_inference.models.OnDemandServingMode(
         serving_type="ON_DEMAND",
@@ -171,7 +180,7 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
         is_stream=form_data.stream,
         seed=form_data.seed,
         temperature=form_data.temperature,
-        max_tokens=form_data.max_tokens,
+        max_tokens=form_data.max_completion_tokens if form_data.max_completion_tokens else form_data.max_tokens,
         top_k=form_data.top_k,
         top_p=form_data.top_p,
         frequency_penalty=form_data.frequency_penalty,
@@ -202,9 +211,7 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
         resp = inference_client.chat(chat_details=chat_details)
     except oci.exceptions.ServiceError as se:
         logger.error(f"ServiceError {se}")
-        return {
-            "error": {"code": se.code, "message": se.message}
-        }
+        return {"error": {"code": se.code, "message": se.message}}
 
     if form_data.stream:
         logger.info("Processing streaming response events")
@@ -243,7 +250,9 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
 # Handle Meta chat completions
 def meta_chat_completions(form_data: OpenAIChatCompletionForm):
 
-    logger.info(f"Processing Generic chat completion request using model {form_data.model}")
+    logger.info(
+        f"Processing Generic chat completion request using model {form_data.model}"
+    )
 
     # convert message format
     messages = []
@@ -301,12 +310,14 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
         is_stream=form_data.stream,
         seed=form_data.seed,
         temperature=form_data.temperature,
-        max_tokens=form_data.max_tokens,
+        max_tokens=form_data.max_completion_tokens if form_data.max_completion_tokens else form_data.max_tokens,
         top_k=form_data.top_k,
         top_p=form_data.top_p,
         frequency_penalty=form_data.frequency_penalty,
         presence_penalty=form_data.presence_penalty,
         stop=form_data.stop,
+        logit_bias=form_data.logit_bias,
+        log_probs=form_data.logprobs,
     )
 
     tools = []
@@ -334,9 +345,7 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
         resp = inference_client.chat(chat_details=chat_details)
     except oci.exceptions.ServiceError as se:
         logger.error(f"ServiceError {se}")
-        return {
-            "error": {"code": se.code, "message": se.message}
-        }
+        return {"error": {"code": se.code, "message": se.message}}
 
     if form_data.stream:
         logger.info("Processing streaming response events")
@@ -420,7 +429,7 @@ async def meta_restreamer(response, model):
                         ],
                     )
                     logger.debug(f'finish_reason: {chunk["finishReason"]}')
-                    logger.debug(f"Streamed content: {content}")
+                    logger.debug(f"Streamed content: {content}") if trace else None
                     yield finish.model_dump_json()
                 elif "toolCalls" in chunk["message"]:
                     # send tool call
@@ -489,10 +498,6 @@ async def meta_restreamer(response, model):
         logger.error(f"ValidationError {ve}, {event.data}")
     except oci.exceptions.ServiceError as se:
         logger.error(f"ServiceError {se}, {event.data}")
-    except:  # TODO
-        e = sys.exc_info()[0]
-        logger.error(f"Exception {e}, {event.data}")
-        pass
 
 
 # Cohere response re-streamer
@@ -521,7 +526,7 @@ async def cohere_restreamer(response, model):
                     ],
                 )
                 logger.debug(f'finish_reason: {chunk["finishReason"]}')
-                logger.debug(f"Streamed content: {content}")
+                logger.debug(f"Streamed content: {content}") if trace else none
                 yield finish.model_dump_json()
             elif "text" in chunk:
                 # send content
@@ -546,10 +551,6 @@ async def cohere_restreamer(response, model):
         logger.error(f"ValidationError {ve}, {event.data}")
     except oci.exceptions.ServiceError as se:
         logger.error(f"ServiceError {se}, {event.data}")
-    except:  # TODO
-        e = sys.exc_info()[0]
-        logger.error(f"Exception {e}, {event.data}")
-        pass
 
 
 # Open AI compatible API endpoint for embeddings
@@ -571,7 +572,7 @@ async def embeddings(form_data: OpenAIEmbeddingsForm) -> OpenAIEmbeddingsRespons
     )
 
     embed_text_details = oci.generative_ai_inference.models.EmbedTextDetails(
-        inputs=[form_data.input] if type(form_data.input) == str else form_data.input,
+        inputs=[form_data.input] if type(form_data.input) is str else form_data.input,
         serving_mode=oci.generative_ai_inference.models.OnDemandServingMode(
             serving_type=oci.generative_ai_inference.models.ServingMode.SERVING_TYPE_ON_DEMAND,
             model_id=form_data.model,

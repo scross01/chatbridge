@@ -1,9 +1,9 @@
 [project]
-name = "oci-generative-ai"
-version = "0.1.0"
+name = "chatbridge"
+dynamic = ["version"]
 description = "OpenAI API compatible adaptor for OCI Generative APIs"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 dependencies = [
     "dotenv>=0.9.9",
     "fastapi>=0.115.12",
@@ -13,3 +13,13 @@ dependencies = [
     "sse-starlette>=2.3.6",
     "uvicorn>=0.34.3",
 ]
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "flake8>=7.2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/scross01/chatbridge"
+Issues = "https://github.com/scross01/chatbridge"

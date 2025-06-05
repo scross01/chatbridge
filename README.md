@@ -1,18 +1,22 @@
-# OCI GenAI OpenAI Compatible API Adapter
+# ChatBridge
 
-An OpenAI API compatible adapter to proxy API requests between AI client that support OpenAI API to interface to to the Oracle Generative AI APIs for Cohere and Generic (Meta Llama) chat and embedding model interations.
+**ChatBridge** provides a locally hosted [OpenAI API compatible](https://platform.openai.com/docs/api-reference/introduction) endpoint that acts as an adaptor/proxy to [OCI Generative AI Inference APIs](https://docs.oracle.com/en-us/iaas/api/#/en/generative-ai-inference/20231130/).
 
-This FastAPI application provides a local OpenAI compatible API endpoint to proxies requests to to the OCI Generative AI services.
+Using ChatBridge enables you to configure AI clients that support adding OpenAI compatible models to use the Cohere and Meta Llama LLM models avaialble from OCI.
 
-This application allows you to interact with the OCI Generative AI service using a locally hosted API interface, which can be useful quickly connect AI tools and clients that support OpenAI's API interface.
+ChatBridge is a Python FastAPI based application that acts as a pass through between the OpenAI API endpoints to the equivilent OCI Generative AI API endpoints using the OCI Python SDK. ChatBridge supports the following APIs:
+
+- `/v1/models` - list available chat models.
+- `/v1/chat/completions` - chat completions.
+- `/v1/embeddings` - uses an OCI supported embeddings model to generation to create the embedding vector representing the input text.
 
 ## Installation
 
 Install from source into a local Python virtualenv. Reqiures the [`uv`](https://docs.astral.sh/uv/getting-started/installation/) pacakge manager.
 
 ```shell
-git clone https://github.com/scross/oci-generative-ai
-cd oci-generative-ai
+git clone https://github.com/scross/chatbridge
+cd chatbridge
 uv venv
 uv sync
 ```
@@ -33,32 +37,79 @@ oci setup bootstrap
 
 ## Usage
 
+><font color="#C93">⚠️ **CAUTION**</font>:
+> ChatBridge uses your locally stored OCI credentails and is intended for localhost single user installation and access only. ChatBridge should not be used in a shared environment. Running the API on a non-local only IP exposes the API server to other machines on your network and potentially the internet. Anyone with access to the IP/URL will have direct authenticated access to you OCI Gen AI services. Ensure that you have appropriate security measures in place to limit access.
+
 ```shell
-uvicorn main:app --reload
+uvicorn chatbridge.main:app --reload
 ```
 
 By default the API will start on http://127.0.0.1:8000. To run on an alternative interface and port you can specify them as follows:
 
 ```shell
-uvicorn main:app --reload --host 0.0.0.0 --port 8080
+uvicorn chatbridge.main:app --reload --host 127.0.0.1 --port 8080
 ```
 
-> CAUTION: running the API on 0.0.0.0 exposes the API server to other machines on your local network and potentially the internet. Anyone with access to the URL will have direct access to you OCI Gen AI service. Ensure that you have appropriate security measures in place to limit access.
+## Supported APIs and capabilities
+
+#### `/v1/models`
+
+List of supported [chat models](https://docs.oracle.com/en-us/iaas/Content/generative-ai/chat-models.htm). The results are filtered only include models that have the "CHAT" capability.
+
+Note the OCI API response appears to include a few LLM CHAT models that are not actually available, or not available in the selected region.
 
 
-## Supported APIs
 
-- `/v1/models` - List of supported [https://docs.oracle.com/en-us/iaas/Content/generative-ai/chat-models.htm](chat models)
-- `/v1/chat/completions` - Generate chat completions for Meta and Cohere models
-- `/v1/embeddings` - Generate embeddings using a supported [https://docs.oracle.com/en-us/iaas/Content/generative-ai/embed-models.htm](embeddings model)
+#### `/v1/chat/completions`
 
-- `/docs` - API documentation
+Generate chat completions for Meta and Cohere models. Automatically uses the appropriate OCI Inference API for Cohere [CohereChatRequest](https://docs.oracle.com/iaas/api/#/en/generative-ai-inference/latest/datatypes/CohereChatRequest) or Meta Llama [GenericChatRequest](https://docs.oracle.com/iaas/api/#/en/generative-ai-inference/latest/datatypes/GenericChatRequest) based on the model selection.
+
+Supported [OpenAI API chat completion options](https://platform.openai.com/docs/api-reference/chat/create)
+
+| Capability | Meta | Cohere |
+| - | - | - |
+| audio | x | x |
+| frequency_penalty | ✅ | ✅ |
+| logit_bias | ✅ | x |
+| logprobs | ✅ | x |
+| max_tokens (deprecated) | ✅ | ✅ |
+| max_completion_tokens | ✅ | ✅ |
+| metadata | x | x |
+| modalities | x | x |
+| n | x | x |
+| parallel_tool_calls | x | x |
+| prediction | x | x |
+| presence_penalty | ✅ | ✅ |
+| reasoning_effort | x | x |
+| response_format | x | x |
+| seed | ✅ | ✅ |
+| service_tier | x | x |
+| stop | ✅ | ✅ |
+| store | x | x |
+| stream | ✅ | ✅ |
+| stream_options | x | x |
+| temperature | ✅ | ✅ |
+| tool_choice | x | x |
+| tools | ✅ | x |
+| top_logprobs | x | x |
+| top_k | ✅ | ✅ |
+| top_p | ✅ | ✅ |
+| user | x | x |
+| web_search_options | x | x |
+
+#### `/v1/embeddings`
+
+Generate embeddings using a supported (embeddings model)(https://docs.oracle.com/en-us/iaas/Content/generative-ai/embed-models.htm)
+
+#### `/docs`
+
+Returns the FAST API documentation
 
 ## Debugging
 
 The following environment variables can be used to enable debugging, set to `true` to enable. Default is `false`.
 
 - `DEBUG` - Enable general debug logs
-- `TRACE` - Enable additional trace level debug logs 
+- `TRACE` - Enable additional trace level debug logs
 - `DEBUG_OCI_SDK` - Enable OCI SDK debug logs
 - `DEBUG_SSE_STARLETTE` - Enable SSE Starlette debug logs
