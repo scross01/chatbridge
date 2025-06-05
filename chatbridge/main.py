@@ -391,7 +391,7 @@ async def meta_restreamer(response, model):
         first_event = True
         for event in response.data.events():
             chunk = json.loads(event.data)
-            logger.debug(f"chunk: {chunk}") if trace else None
+            # logger.debug(f"chunk: {chunk}") if trace else None
             if "message" in chunk:
                 if first_event:
                     # send just the role first as a separate chunk
