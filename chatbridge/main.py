@@ -45,7 +45,7 @@ debug_sse = os.getenv("DEBUG_SSE_STARLETTE", "false").lower() == "true"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# set component level logging based on the env settings 
+# set component level logging based on the env settings
 logger.setLevel(logging.DEBUG if debug else logging.INFO)
 logging.getLogger("oci").setLevel(logging.DEBUG if debug_oci else logging.INFO)
 logging.getLogger("sse_starlette").setLevel(
@@ -180,7 +180,11 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
         is_stream=form_data.stream,
         seed=form_data.seed,
         temperature=form_data.temperature,
-        max_tokens=form_data.max_completion_tokens if form_data.max_completion_tokens else form_data.max_tokens,
+        max_tokens=(
+            form_data.max_completion_tokens
+            if form_data.max_completion_tokens
+            else form_data.max_tokens
+        ),
         top_k=form_data.top_k,
         top_p=form_data.top_p,
         frequency_penalty=form_data.frequency_penalty,
@@ -310,7 +314,11 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
         is_stream=form_data.stream,
         seed=form_data.seed,
         temperature=form_data.temperature,
-        max_tokens=form_data.max_completion_tokens if form_data.max_completion_tokens else form_data.max_tokens,
+        max_tokens=(
+            form_data.max_completion_tokens
+            if form_data.max_completion_tokens
+            else form_data.max_tokens
+        ),
         top_k=form_data.top_k,
         top_p=form_data.top_p,
         frequency_penalty=form_data.frequency_penalty,
@@ -353,15 +361,33 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
         return EventSourceResponse(meta_restreamer(resp, form_data.model))
     else:
         logger.info("Converting from Generic response format")
+        logger.debug(f"response: {resp.data}") if trace else None
+
         # convert response format
         choices = []
         for choice in resp.data.chat_response.choices:
+            content = choice.message.content[0].text if choice.message.content else None
+            tool_calls = []
+            for tool_call in choice.message.tool_calls:
+                function = {
+                    "name": tool_call.name,
+                    "arguments": tool_call.arguments,
+                }
+                tool_calls.append(
+                    OpenAPIFunctionCall(
+                        id=tool_call.id,
+                        function=function,
+                        type="function",
+                    )
+                )
+
             choices.append(
                 OpenAIChatChoice(
                     index=choice.index,
                     message=OpenAIChatMessage(
                         role=choice.message.role.lower(),
-                        content=choice.message.content[0].text,
+                        content=content,
+                        tool_calls=tool_calls if len(tool_calls) > 0 else None,
                     ),
                     finish_reason=choice.finish_reason,
                 )
@@ -526,7 +552,7 @@ async def cohere_restreamer(response, model):
                     ],
                 )
                 logger.debug(f'finish_reason: {chunk["finishReason"]}')
-                logger.debug(f"Streamed content: {content}") if trace else none
+                logger.debug(f"Streamed content: {content}") if trace else None
                 yield finish.model_dump_json()
             elif "text" in chunk:
                 # send content

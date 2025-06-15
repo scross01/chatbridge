@@ -2,11 +2,21 @@ from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
 
+# OpenAI chat completion streaming delta for tool calls
+# https://platform.openai.com/docs/guides/function-calling#streaming
+class OpenAPIFunctionCall(BaseModel):
+    index: Optional[int] = None
+    id: str | None
+    function: dict
+    type: str | None
+
+
 # simplified representation of OpenAI Chat API response
 # https://platform.openai.com/docs/api-reference/chat/create
 class OpenAIChatMessage(BaseModel):
     role: str
-    content: str | List
+    content: Optional[str | List] = None
+    tool_calls: Optional[List[OpenAPIFunctionCall]] = None
 
     model_config = ConfigDict(extra="allow")
 
@@ -76,15 +86,6 @@ class OpenAIChatCompletionResponse(BaseModel):
     created: int
     model: str
     choices: List[OpenAIChatChoice]
-
-
-# OpenAI chat completion streaming delta for tool calls
-# https://platform.openai.com/docs/guides/function-calling#streaming
-class OpenAPIFunctionCall(BaseModel):
-    index: int
-    id: str | None
-    function: dict
-    type: str | None
 
 
 # OpenAI chat completion streaming detla object within response choices
