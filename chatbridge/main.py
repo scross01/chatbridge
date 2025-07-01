@@ -90,6 +90,10 @@ async def get_models():
         sort_order="ASC",  # NOTE: this option has no effect - BUG?
     )
 
+    if resp is None or resp.data is None:
+        logger.error("Invalid or empty reponse")
+        return {"error": {"code": None, "message": "empty response"}}
+
     # logger.debug(resp.data) if trace else None
 
     # filter the response
@@ -216,6 +220,10 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
     except oci.exceptions.ServiceError as se:
         logger.error(f"ServiceError {se}")
         return {"error": {"code": se.code, "message": se.message}}
+
+    if resp is None or resp.data is None:
+        logger.error("Invalid or empty reponse")
+        return {"error": {"code": None, "message": "empty response"}}
 
     if form_data.stream:
         logger.info("Processing streaming response events")
@@ -354,6 +362,10 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
     except oci.exceptions.ServiceError as se:
         logger.error(f"ServiceError {se}")
         return {"error": {"code": se.code, "message": se.message}}
+
+    if resp is None or resp.data is None:
+        logger.error("Invalid or empty reponse")
+        return {"error": {"code": None, "message": "empty response"}}
 
     if form_data.stream:
         logger.info("Processing streaming response events")
@@ -583,7 +595,9 @@ async def cohere_restreamer(response, model):
 # https://platform.openai.com/docs/api-reference/embeddings
 @app.post("/embeddings")
 @app.post("/v1/embeddings")
-async def embeddings(form_data: OpenAIEmbeddingsForm) -> OpenAIEmbeddingsResponse:
+async def embeddings(
+    form_data: OpenAIEmbeddingsForm,
+) -> OpenAIEmbeddingsResponse | None:
 
     logger.info(f"Processing request using model {form_data.model}")
     logger.debug(f"/v1/embeddings {form_data}")
@@ -593,7 +607,8 @@ async def embeddings(form_data: OpenAIEmbeddingsForm) -> OpenAIEmbeddingsRespons
     # - the text passages that are being searched over should be embedded with input_type="search_document".
     input_type = (
         "SEARCH_DOCUMENT"
-        if form_data.input[0].startswith("<document_metadata>")
+        if type(form_data.input[0]) is str
+        and form_data.input[0].startswith("<document_metadata>")
         else "SEARCH_QUERY"
     )
 
@@ -615,6 +630,11 @@ async def embeddings(form_data: OpenAIEmbeddingsForm) -> OpenAIEmbeddingsRespons
         resp = inference_client.embed_text(embed_text_details=embed_text_details)
     except oci.exceptions.ServiceError as se:
         logger.error(f"ServiceError {se}")
+        return
+
+    if resp is None or resp.data is None:
+        logger.error("Invalid or empty reponse")
+        return
 
     # Extract embeddings from response
     embeddings = resp.data.embeddings
