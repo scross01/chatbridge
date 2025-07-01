@@ -6,7 +6,8 @@ import logging
 import os
 import uuid
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import ValidationError
 
 from sse_starlette import EventSourceResponse
@@ -52,6 +53,10 @@ logging.getLogger("sse_starlette").setLevel(
     logging.DEBUG if debug_sse else logging.INFO
 )
 
+api_key = os.getenv("API_KEY", None)
+
+security = HTTPBearer()
+
 app = FastAPI(
     debug=False,
     title="OpenAI Compatible API",
@@ -74,11 +79,20 @@ inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(
 )
 
 
+# Validate the API KEY if set
+async def validate_api_key(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    if api_key and (credentials.scheme != "Bearer" or credentials.credentials != api_key):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    return credentials.credentials
+
+
 # Open AI compatible API endpoint to fetch list of supported models
 # https://platform.openai.com/docs/api-reference/models
 @app.get("/models")
 @app.get("/v1/models")
-async def get_models():
+async def get_models(api_key: str = Depends(validate_api_key)):
 
     logger.debug("/v1/models")
 
@@ -125,7 +139,9 @@ async def get_models():
 # https://platform.openai.com/docs/api-reference/chat/create
 @app.post("/chat/completions")
 @app.post("/v1/chat/completions")
-async def chat_completions(form_data: OpenAIChatCompletionForm):
+async def chat_completions(
+    form_data: OpenAIChatCompletionForm, api_key: str = Depends(validate_api_key)
+):
 
     logger.debug(f"/v1/chat/completions {form_data}")
 
@@ -596,7 +612,7 @@ async def cohere_restreamer(response, model):
 @app.post("/embeddings")
 @app.post("/v1/embeddings")
 async def embeddings(
-    form_data: OpenAIEmbeddingsForm,
+    form_data: OpenAIEmbeddingsForm, api_key: str = Depends(validate_api_key)
 ) -> OpenAIEmbeddingsResponse | None:
 
     logger.info(f"Processing request using model {form_data.model}")

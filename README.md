@@ -1,10 +1,10 @@
-# ChatBridge
+# Chatbridge
 
-**ChatBridge** provides a locally hosted [OpenAI API compatible](https://platform.openai.com/docs/api-reference/introduction) endpoint that acts as an adaptor/proxy to [OCI Generative AI Inference APIs](https://docs.oracle.com/en-us/iaas/api/#/en/generative-ai-inference/20231130/).
+**Chatbridge** provides a locally hosted [OpenAI API compatible](https://platform.openai.com/docs/api-reference/introduction) endpoint that acts as an adaptor/proxy to [OCI Generative AI Inference APIs](https://docs.oracle.com/en-us/iaas/api/#/en/generative-ai-inference/20231130/).
 
-Using ChatBridge enables you to configure AI clients that support adding OpenAI compatible models to use the Cohere and Meta Llama LLM models avaialble from OCI.
+Using Chatbridge enables you to configure AI clients that support adding OpenAI compatible models to use the Cohere and Meta Llama LLM models avaialble from OCI.
 
-ChatBridge is a Python FastAPI based application that acts as a pass through between the OpenAI API endpoints to the equivilent OCI Generative AI API endpoints using the OCI Python SDK. ChatBridge supports the following APIs:
+Chatbridge is a Python FastAPI based application that acts as a pass through between the OpenAI API endpoints to the equivilent OCI Generative AI API endpoints using the OCI Python SDK. Chatbridge supports the following APIs:
 
 - `/v1/models` - list available chat models.
 - `/v1/chat/completions` - chat completions.
@@ -15,8 +15,8 @@ ChatBridge is a Python FastAPI based application that acts as a pass through bet
 Install from source into a local Python virtualenv. Reqiures the [`uv`](https://docs.astral.sh/uv/getting-started/installation/) pacakge manager.
 
 ```shell
-git clone https://github.com/scross/chatbridge
-cd chatbridge
+git clone https://github.com/scross/Chatbridge
+cd Chatbridge
 uv venv
 uv sync
 ```
@@ -35,19 +35,25 @@ oci setup bootstrap
 - `OCI_CONFIG_PROFILE`: Name of the OCI configuration profile (default: `DEFAULT`)
 - `OCI_CONFIG_REGION`: Region where the OCI service is located (optional)
 
+## Chatbridge configuration
+
+The following additional configuration seetings can also be set in the local shell or the `.env` file.
+
+- `API_KEY` - API key that must be passed by the client and the Authorization token (optional).
+
 ## Usage
 
 ><font color="#C93">⚠️ **CAUTION**</font>:
-> ChatBridge uses your locally stored OCI credentails and is intended for localhost single user installation and access only. ChatBridge should not be used in a shared environment. Running the API on a non-local only IP exposes the API server to other machines on your network and potentially the internet. Anyone with access to the IP/URL will have direct authenticated access to you OCI Gen AI services. Ensure that you have appropriate security measures in place to limit access.
+> Chatbridge uses your locally stored OCI credentails and is intended for localhost single user installation and access only. Chatbridge should not be used in a shared environment. Running the API on a non-local only IP exposes the API server to other machines on your network and potentially the internet. Anyone with access to the IP/URL will have direct authenticated access to you OCI Gen AI services. Ensure that you have appropriate security measures in place to limit access.
 
 ```shell
-uvicorn chatbridge.main:app --reload
+uvicorn Chatbridge.main:app --reload
 ```
 
 By default the API will start on http://127.0.0.1:8000. To run on an alternative interface and port you can specify them as follows:
 
 ```shell
-uvicorn chatbridge.main:app --reload --host 127.0.0.1 --port 8080
+uvicorn Chatbridge.main:app --reload --host 127.0.0.1 --port 8080
 ```
 
 ## Supported APIs and capabilities
