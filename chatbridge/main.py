@@ -83,7 +83,9 @@ inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(
 async def validate_api_key(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    if api_key and (credentials.scheme != "Bearer" or credentials.credentials != api_key):
+    if api_key and (
+        credentials.scheme != "Bearer" or credentials.credentials != api_key
+    ):
         raise HTTPException(status_code=401, detail="Invalid API key")
     return credentials.credentials
 
