@@ -17,10 +17,10 @@ Chatbridge is a Python FastAPI based application that acts as a pass through bet
 Install from source into a local Python virtualenv. Reqiures the [`uv`](https://docs.astral.sh/uv/getting-started/installation/) pacakge manager.
 
 ```shell
-git clone https://github.com/scross/Chatbridge
-cd Chatbridge
-uv venv
+git clone https://github.com/scross/chatbridge
+cd chatbridge
 uv sync
+source .venv/bin/activate
 ```
 
 ### OCI API Configuration
