@@ -1,0 +1,15 @@
+---
+services:
+  chatbridge:
+    image: chatbridge:latest
+    container_name: chatbridge
+    # restart: unless-stopped
+    environment:
+      OCI_CONFIG_PROFILE: DEFAULT
+      OCI_CONFIG_REGION: us-chicago-1
+      # replace with a new random API key - e.g. `openssl rand -base64 32`
+      API_KEY: CHANGEME
+    volumes:
+      - ${HOME}/.oci:/home/chatbridge/.oci
+    ports:
+      - 8000:8000

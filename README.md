@@ -41,12 +41,12 @@ oci setup bootstrap
 
 The following additional configuration seetings can also be set in the local shell or the `.env` file.
 
-- `API_KEY` - API key that must be passed by the client and the Authorization token (optional).
+- `API_KEY` - API key that must be passed by the client as the Authorization token (optional). The API key can be any text string. One way to generate a new unique key is to run `openssl rand -base64 32`.
 
 ## Usage
 
 ><font color="#C93">⚠️ **CAUTION**</font>:
-> Chatbridge uses your locally stored OCI credentails and is intended for localhost single user installation and access only. Chatbridge should not be used in a shared environment. Running the API on a non-local only IP exposes the API server to other machines on your network and potentially the internet. Anyone with access to the IP/URL will have direct authenticated access to you OCI Gen AI services. Ensure that you have appropriate security measures in place to limit access.
+> Chatbridge uses your locally stored OCI credentails and is intended for localhost single user installation and access only. Chatbridge should not be used in a shared environment. Running the API on a non-local only IP exposes the API server to other machines on your network and potentially the internet. Anyone with access to the IP/URL will have direct authenticated access to you OCI Gen AI services. Ensure that you have appropriate security measures in place to limit access including setting a unique `API_KEY`.
 
 ```shell
 uvicorn chatbridge.main:app --reload
@@ -56,6 +56,27 @@ By default the API will start on `http://127.0.0.1:8000`. To run on an alternati
 
 ```shell
 uvicorn chatbridge.main:app --host 127.0.0.1 --port 8080
+```
+
+### Running using Docker
+
+A [Dockerfile](./Dockerfile) and sample [docker-compose.yml](./docker/docker-compose.yml) are included for running Chatbridge using docker.
+
+```shell
+docker build . --tag chatbridge
+```
+
+To run using `docker run`. Ensure that `API_KEY` is set in your `.env` file.
+
+```shell
+docker run --rm -p 8000:8000 -v ~/.oci:/home/chatbridge/.oci --env-file .env chatbridge 
+```
+
+To run using docker compose. Modify the `docker/docker-compose.yml` to set a new `API_KEY`
+
+```shell
+cd docker
+docker compose up
 ```
 
 ## Supported APIs and capabilities
