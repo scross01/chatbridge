@@ -54,6 +54,8 @@ logging.getLogger("sse_starlette").setLevel(
 )
 
 api_key = os.getenv("API_KEY", None)
+if not api_key or api_key == "":
+    logger.warning("API_KEY is not configured, access is open to unauthenticated clients.")
 
 security = HTTPBearer()
 
