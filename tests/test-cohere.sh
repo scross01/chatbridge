@@ -5,8 +5,8 @@ curl -v -X 'POST' \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $API_KEY" \
   -d '{
-  "stream": true,
-  "model": "meta.llama-3.3-70b-instruct",
+  "stream": false,
+  "model": "cohere.command-r-08-2024",
   "messages": [
     {
       "role": "user",

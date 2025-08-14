@@ -5,7 +5,7 @@ curl -v -X 'POST' \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $API_KEY" \
   -d '{
-  "stream": true,
+  "stream": false,
   "model": "meta.llama-3.3-70b-instruct",
   "messages": [
     {
@@ -13,4 +13,4 @@ curl -v -X 'POST' \
       "content": "why is the sky blue. describe in one sentence"
     }
   ]
-}'
+}

@@ -6,7 +6,7 @@ curl -v -X 'POST' \
   -H "Authorization: Bearer $API_KEY" \
   -d '{
   "stream": true,
-  "model": "meta.llama-3.3-70b-instruct",
+  "model": "xai.grok-3",
   "messages": [
     {
       "role": "user",

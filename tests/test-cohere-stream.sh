@@ -3,6 +3,7 @@ curl -v -X 'POST' \
   'http://localhost:8000/v1/chat/completions' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $API_KEY" \
   -d '{
   "stream": true,
   "model": "cohere.command-r-08-2024",
