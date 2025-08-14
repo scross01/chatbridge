@@ -145,20 +145,20 @@ The following models have been tested in us-chicago-1.
 | cohere.command-a-03-2025 | ✅ | |
 | cohere.command-r-08-2024 | ✅ | |
 | cohere.command-r-plus-08-2024 | ✅ | |
-| cohere.command-r-16k | x | retired |
-| cohere.command-r-plus | x | retired |
+| ~~cohere.command-r-16k~~ | x | retired |
+| ~~cohere.command-r-plus~~ | x | retired |
 | meta.llama-4-maverick-17b-128e-instruct-fp8 | ✅ | |
 | meta.llama-4-scout-17b-16e-instruct | ✅ | |
 | meta.llama-3.3-70b-instruct | ✅ | |
 | meta.llama-3.2-90b-vision-instruct | ✅ | |
 | meta.llama-3.2-11b-vision-instruct | x | dedicated AI clusters only |
 | meta.llama-3.1-405b-instruct | ✅ | |
-| meta.llama-3.1-70b-instruct | ✅ | deprecated |
-| meta.llama-3-70b-instruct | x | retired |
-| xai.grok-3 | ? | not tested |
-| xai.grok-3-mini | ? | not tested |
-| xai.grok-3-fast | ? | not tested |
-| xai.grok-3-mini-fast | ? | not tested |
+| ~~meta.llama-3.1-70b-instruct~~ | x | retired |
+| ~~meta.llama-3-70b-instruct~~ | x | retired |
+| xai.grok-3 | ✅ | |
+| xai.grok-3-mini | ✅ | |
+| xai.grok-3-fast | ✅ | |
+| xai.grok-3-mini-fast | ✅ | |
 
 | Embedding Models | Status | Comments |
 | - | - | - |
