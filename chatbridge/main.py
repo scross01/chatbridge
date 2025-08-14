@@ -27,6 +27,8 @@ from .schema import (
     OpenAIModel,
 )
 
+from .__version__ import __version__
+
 dotenv.load_dotenv()
 
 config_file = os.getenv("OCI_CONFIG_FILE", "~/.oci/config")
@@ -75,6 +77,9 @@ config = oci.config.from_file(file_location=config_file, profile_name=config_pro
 if region:
     # overide the region if set
     config["region"] = region
+
+# set the user agent header
+config["additional_user_agent"] = f"(scross01/chatbridge/{__version__})"
 
 # create the OCI clients
 generative_ai_client = oci.generative_ai.GenerativeAiClient(config=config)
