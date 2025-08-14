@@ -402,18 +402,19 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
         for choice in resp.data.chat_response.choices:
             content = choice.message.content[0].text if choice.message.content else None
             tool_calls = []
-            for tool_call in choice.message.tool_calls:
-                function = {
-                    "name": tool_call.name,
-                    "arguments": tool_call.arguments,
-                }
-                tool_calls.append(
-                    OpenAPIFunctionCall(
-                        id=tool_call.id,
-                        function=function,
-                        type="function",
+            if choice.message.tool_calls:
+                for tool_call in choice.message.tool_calls:
+                    function = {
+                        "name": tool_call.name,
+                        "arguments": tool_call.arguments,
+                    }
+                    tool_calls.append(
+                        OpenAPIFunctionCall(
+                            id=tool_call.id,
+                            function=function,
+                            type="function",
+                        )
                     )
-                )
 
             choices.append(
                 OpenAIChatChoice(
