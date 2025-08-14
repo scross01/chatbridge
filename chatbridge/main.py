@@ -152,12 +152,15 @@ async def chat_completions(
     logger.debug(f"/v1/chat/completions {form_data}")
 
     if form_data.model.startswith("meta."):
-        return meta_chat_completions(form_data=form_data)
+        return generic_chat_completions(form_data=form_data)
     elif form_data.model.startswith("cohere."):
         return cohere_chat_completions(form_data=form_data)
+    elif form_data.model.startswith("xai."):
+        return generic_chat_completions(form_data=form_data)
     else:
-        # unsupported model type
-        logger.error(f"Unsupported model {form_data.model}")
+        # unsupported model type, try with the generic handler
+        logger.warning(f"Unsupported model {form_data.model}")
+        return generic_chat_completions(form_data=form_data)
         return
 
 
@@ -281,8 +284,8 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
         return response
 
 
-# Handle Meta chat completions
-def meta_chat_completions(form_data: OpenAIChatCompletionForm):
+# Handle Generic chat completions (used for meta and xai models)
+def generic_chat_completions(form_data: OpenAIChatCompletionForm):
 
     logger.info(
         f"Processing Generic chat completion request using model {form_data.model}"
@@ -392,7 +395,7 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
     if form_data.stream:
         logger.info("Processing streaming response events")
         # re-stream the response
-        return EventSourceResponse(meta_restreamer(resp, form_data.model))
+        return EventSourceResponse(generic_restreamer(resp, form_data.model))  # pyright: ignore[reportArgumentType]
     else:
         logger.info("Converting from Generic response format")
         logger.debug(f"response: {resp.data}") if trace else None
@@ -444,7 +447,7 @@ def meta_chat_completions(form_data: OpenAIChatCompletionForm):
 # Meta response re-streamer
 # convert and re-stream the response event stream back to the client
 # https://platform.openai.com/docs/api-reference/chat/streaming
-async def meta_restreamer(response, model):
+async def generic_restreamer(response, model):
     logger.debug("Streaming response")
     try:
         content = ""
