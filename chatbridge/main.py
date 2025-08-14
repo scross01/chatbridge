@@ -51,15 +51,11 @@ logger = logging.getLogger(__name__)
 # set component level logging based on the env settings
 logger.setLevel(logging.DEBUG if debug else logging.INFO)
 logging.getLogger("oci").setLevel(logging.DEBUG if debug_oci else logging.INFO)
-logging.getLogger("sse_starlette").setLevel(
-    logging.DEBUG if debug_sse else logging.INFO
-)
+logging.getLogger("sse_starlette").setLevel(logging.DEBUG if debug_sse else logging.INFO)
 
 api_key = os.getenv("API_KEY", None)
 if not api_key or api_key == "":
-    logger.warning(
-        "API_KEY is not configured, access is open to unauthenticated clients."
-    )
+    logger.warning("API_KEY is not configured, access is open to unauthenticated clients.")
 
 security = HTTPBearer()
 
@@ -83,9 +79,7 @@ config["additional_user_agent"] = f"(scross01/chatbridge/{__version__})"
 
 # create the OCI clients
 generative_ai_client = oci.generative_ai.GenerativeAiClient(config=config)
-inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(
-    config=config
-)
+inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(config=config)
 
 
 # Validate the API KEY if set
@@ -150,9 +144,7 @@ async def get_models(api_key: str = Depends(validate_api_key)):
 # https://platform.openai.com/docs/api-reference/chat/create
 @app.post("/chat/completions")
 @app.post("/v1/chat/completions")
-async def chat_completions(
-    form_data: OpenAIChatCompletionForm, api_key: str = Depends(validate_api_key)
-):
+async def chat_completions(form_data: OpenAIChatCompletionForm, api_key: str = Depends(validate_api_key)):
 
     logger.debug(f"/v1/chat/completions {form_data}")
 
@@ -172,9 +164,7 @@ async def chat_completions(
 # Handle Cohere chat completions
 def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
 
-    logger.info(
-        f"Processing Cohere chat completion request using model {form_data.model}"
-    )
+    logger.info(f"Processing Cohere chat completion request using model {form_data.model}")
 
     serving_mode = oci.generative_ai_inference.models.OnDemandServingMode(
         serving_type="ON_DEMAND",
@@ -185,23 +175,11 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
     # collect the message history, excluding the last one which is the user's input
     for message in form_data.messages[:-1]:
         if message.role == "system":
-            chat_history.append(
-                oci.generative_ai_inference.models.CohereSystemMessage(
-                    message=message.content
-                )
-            )
+            chat_history.append(oci.generative_ai_inference.models.CohereSystemMessage(message=message.content))
         elif message.role == "user":
-            chat_history.append(
-                oci.generative_ai_inference.models.CohereUserMessage(
-                    message=message.content
-                )
-            )
+            chat_history.append(oci.generative_ai_inference.models.CohereUserMessage(message=message.content))
         elif message.role == "assistant":
-            chat_history.append(
-                oci.generative_ai_inference.models.CohereChatBotMessage(
-                    message=message.content
-                )
-            )
+            chat_history.append(oci.generative_ai_inference.models.CohereChatBotMessage(message=message.content))
         else:
             raise ValueError(f"Unsupported role: {message.role}")
 
@@ -214,11 +192,7 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
         is_stream=form_data.stream,
         seed=form_data.seed,
         temperature=form_data.temperature,
-        max_tokens=(
-            form_data.max_completion_tokens
-            if form_data.max_completion_tokens
-            else form_data.max_tokens
-        ),
+        max_tokens=(form_data.max_completion_tokens if form_data.max_completion_tokens else form_data.max_tokens),
         top_k=form_data.top_k,
         top_p=form_data.top_p,
         frequency_penalty=form_data.frequency_penalty,
@@ -292,9 +266,7 @@ def cohere_chat_completions(form_data: OpenAIChatCompletionForm):
 # Handle Generic chat completions (used for meta and xai models)
 def generic_chat_completions(form_data: OpenAIChatCompletionForm):
 
-    logger.info(
-        f"Processing Generic chat completion request using model {form_data.model}"
-    )
+    logger.info(f"Processing Generic chat completion request using model {form_data.model}")
 
     # convert message format
     messages = []
@@ -330,9 +302,7 @@ def generic_chat_completions(form_data: OpenAIChatCompletionForm):
                 else:
                     logger.error(f'unsupported message content type {item["type"]}')
         else:
-            logger.error(
-                f"unexpected message content colletion {type(message.content)}"
-            )
+            logger.error(f"unexpected message content colletion {type(message.content)}")
 
         messages.append(
             oci.generative_ai_inference.models.UserMessage(
@@ -352,11 +322,7 @@ def generic_chat_completions(form_data: OpenAIChatCompletionForm):
         is_stream=form_data.stream,
         seed=form_data.seed,
         temperature=form_data.temperature,
-        max_tokens=(
-            form_data.max_completion_tokens
-            if form_data.max_completion_tokens
-            else form_data.max_tokens
-        ),
+        max_tokens=(form_data.max_completion_tokens if form_data.max_completion_tokens else form_data.max_tokens),
         top_k=form_data.top_k,
         top_p=form_data.top_p,
         frequency_penalty=form_data.frequency_penalty,
@@ -534,11 +500,7 @@ async def generic_restreamer(response, model):
                         object="chat.completion.chunk",
                         created=int(datetime.datetime.now().timestamp()),
                         model=model,
-                        choices=[
-                            OpenAIChatChunkChoice(
-                                index=0, delta=OpenAIChatDelta(tool_calls=tool_calls)
-                            )
-                        ],
+                        choices=[OpenAIChatChunkChoice(index=0, delta=OpenAIChatDelta(tool_calls=tool_calls))],
                     )
                     logger.debug(f"using tool calls: {tool_calls}") if trace else None
                     yield message.model_dump_json()
@@ -638,8 +600,7 @@ async def embeddings(
     # - the text passages that are being searched over should be embedded with input_type="search_document".
     input_type = (
         "SEARCH_DOCUMENT"
-        if type(form_data.input[0]) is str
-        and form_data.input[0].startswith("<document_metadata>")
+        if type(form_data.input[0]) is str and form_data.input[0].startswith("<document_metadata>")
         else "SEARCH_QUERY"
     )
 
